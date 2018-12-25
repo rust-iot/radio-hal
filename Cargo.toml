@@ -1,6 +1,7 @@
 [package]
 name = "radio"
 description = "Generic traits for embedded packet radio devices"
-version = "0.1.0"
+repository = "https://github.com/ryankurte/rust-radio"
 authors = ["Ryan Kurte <ryankurte@gmail.com>"]
-
+license = "MIT"
+version = "0.1.0"
