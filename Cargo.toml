@@ -1,14 +1,6 @@
 [package]
 name = "radio"
+description = "Generic traits for embedded packet radio devices"
 version = "0.1.0"
 authors = ["Ryan Kurte <ryankurte@gmail.com>"]
 
-[dependencies]
-nb = "0.1.1"
-managed = "0.5.1"
-
-[features]
-std = ["managed/std"]
-default = [
-  "std"
-]
