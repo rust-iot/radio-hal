@@ -9,6 +9,9 @@ For similar examples, check out:
     [netdev_ieee802154.c](https://github.com/RIOT-OS/RIOT/blob/master/drivers/netdev_ieee802154/netdev_ieee802154.c)
 - Contiki-OS
   - TODO
+- Tock-PS
+  - [ieee802154/device.rs](https://github.com/tock/tock/blob/master/capsules/src/ieee802154/device.rs)
+
 
 ## Status
 
@@ -19,9 +22,9 @@ For similar examples, check out:
 
 [Open Issues](https://github.com/ryankurte/rust-radio/issues)
 
-** Work In Progress **
+**Work In Progress**
 
-Features:
+### Features:
 
 - [x] Transmit
 - [x] Receive
@@ -29,3 +32,4 @@ Features:
 - [x] Register Access
 - [ ] Configuration
 - [ ] 802.15.4
+
