@@ -110,7 +110,7 @@ pub trait Power {
     type Error;
 
     /// Set the radio power in dBm
-    fn set_power(&mut self, power: u8) -> Result<(), Self::Error>;
+    fn set_power(&mut self, power: i8) -> Result<(), Self::Error>;
 }
 
 /// Rssi trait allows polling for RSSI on the current channel
