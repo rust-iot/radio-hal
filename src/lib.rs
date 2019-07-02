@@ -7,6 +7,14 @@
 #![no_std]
 #![deny(unsafe_code)]
 
+extern crate nb;
+
+#[macro_use]
+extern crate log;
+
+#[cfg(feature="blocking-api")]
+pub mod blocking;
+
 /// Radio trait combines Base, Configure, Send and Receive for a generic radio object
 pub trait Radio: Transmit + Receive {}
 

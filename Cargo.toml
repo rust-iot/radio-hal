@@ -5,3 +5,12 @@ repository = "https://github.com/ryankurte/rust-radio"
 authors = ["Ryan Kurte <ryankurte@gmail.com>"]
 license = "MIT"
 version = "0.3.0"
+
+[features]
+blocking-api = []
+default = []
+
+[dependencies]
+nb = "0.1.2"
+log = "0.4.6"
+
