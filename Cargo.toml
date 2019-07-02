@@ -7,10 +7,11 @@ license = "MIT"
 version = "0.3.0"
 
 [features]
-blocking-api = []
+blocking-api = [ "embedded-hal" ]
 default = []
 
 [dependencies]
 nb = "0.1.2"
 log = "0.4.6"
+embedded-hal = { version = "0.2.3", optional = true }
 
