@@ -4,7 +4,7 @@ description = "Generic traits for embedded packet radio devices"
 repository = "https://github.com/ryankurte/rust-radio"
 authors = ["Ryan Kurte <ryankurte@gmail.com>"]
 license = "MIT"
-version = "0.4.0"
+version = "0.4.1"
 
 [dependencies]
 nb = "0.1.2"
