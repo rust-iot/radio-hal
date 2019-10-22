@@ -3,7 +3,7 @@ use core::time::Duration;
 
 use embedded_hal::blocking::delay::DelayMs;
 
-use crate::{Transmit, Receive, Power};
+use crate::{Transmit, Receive, Power, State};
 
 pub struct BlockingOptions {
     pub power: Option<i8>,
@@ -55,13 +55,13 @@ where
         let mut c = 0;
         loop {
             if self.check_transmit()? {
-                debug!("Send complete");
+                debug!("Blocking send complete");
                 break;
             }
             
             c += tx_options.poll_interval.as_millis();
             if c > t {
-                debug!("Send timeout");
+                debug!("Blocking send timeout");
                 return Err(BlockingError::Timeout)
             }
 
@@ -97,11 +97,52 @@ where
 
             c += rx_options.poll_interval.as_millis();
             if c > t {
-                debug!("Send timeout");
+                debug!("Blocking receive timeout");
                 return Err(BlockingError::Timeout)
             }
 
             self.delay_ms(rx_options.poll_interval.as_millis() as u32);
         }
+    }
+}
+
+/// BlockingSetState sets the radio state and polls until command completion
+pub trait BlockingSetState<S, E> {
+    fn set_state_checked(&mut self, state: S, options: BlockingOptions) -> Result<(), BlockingError<E>>;
+}
+
+impl <T, S, E>BlockingSetState<S, E> for T 
+where 
+    T: State<State=S, Error=E> + DelayMs<u32>,
+    S: core::fmt::Debug + core::cmp::PartialEq + Copy,
+    E: core::fmt::Debug,
+{
+    fn set_state_checked(&mut self, state: S, options: BlockingOptions) -> Result<(), BlockingError<E>> {
+        // Send set state command
+        self.set_state(state)?;
+
+        let t = options.timeout.as_millis();
+        let mut c = 0;
+
+        loop {
+            // Fetch state
+            let s = self.get_state()?;
+
+            // Check for expected state
+            if state == s {
+                return Ok(())
+            }
+
+            // Timeout eventually
+            c += options.poll_interval.as_millis();
+            if c > t {
+                debug!("Blocking receive timeout");
+                return Err(BlockingError::Timeout)
+            }
+
+            // Delay before next loop
+            self.delay_ms(options.poll_interval.as_millis() as u32);
+        }
+
     }
 }
