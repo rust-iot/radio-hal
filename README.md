@@ -4,7 +4,7 @@ An [embedded-hal](https://github.com/rust-embedded/embedded-hal) like abstractio
 
 Radio devices should implement the core traits, and then gain automatic [blocking]() helper functions.
 
-Experimental async/await helpers are available behind the `async-await` feature flag.
+Experimental async/await helpers are available behind the `async-await` feature flag, and requires nightly for compilation.
 
 ## Status
 
