@@ -5,7 +5,7 @@ repository = "https://github.com/ryankurte/rust-radio"
 authors = ["Ryan Kurte <ryankurte@gmail.com>"]
 license = "MIT"
 edition = "2018"
-version = "0.4.1"
+version = "0.4.2"
 
 [features]
 async-await = [ "core", "async-std" ]
