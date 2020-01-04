@@ -1,8 +1,7 @@
 //! Abstract packet radio interfaces
 //! 
-//! https://github.com/rust-iot/radio
-//! 
-// Copyright 2018 Ryan Kurte
+//! https://github.com/ryankurte/rust-radio
+// Copyright 2020 Ryan Kurte
 
 #![no_std]
 #![deny(unsafe_code)]
@@ -14,7 +13,13 @@ extern crate log;
 
 extern crate embedded_hal;
 
+//#[cfg(feature="async-await")]
+extern crate async_trait;
+
 pub mod blocking;
+
+#[cfg(feature="async-await")]
+pub mod nonblocking;
 
 /// Radio trait combines Base, Configure, Send and Receive for a generic radio object
 pub trait Radio: Transmit + Receive {}
@@ -59,7 +64,7 @@ pub trait Receive {
     /// 
     /// This copies received data into the provided buffer and returns the number of bytes received
     /// as well as information about the received packet
-    fn get_received<'a>(&mut self, &mut Self::Info, &'a mut [u8]) -> Result<usize, Self::Error>;
+    fn get_received(&mut self, info: &mut Self::Info, buff: &mut [u8]) -> Result<usize, Self::Error>;
 }
 
 /// Default / Standard packet information structure for radio devices that provide only rssi 
