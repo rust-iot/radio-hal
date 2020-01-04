@@ -5,10 +5,10 @@ repository = "https://github.com/ryankurte/rust-radio"
 authors = ["Ryan Kurte <ryankurte@gmail.com>"]
 license = "MIT"
 edition = "2018"
-version = "0.4.2"
+version = "0.4.1"
 
 [features]
-async-await = [ "core", "async-std" ]
+async-await = [ "core" ]
 default = []
 
 [dependencies]
@@ -17,11 +17,9 @@ log = "0.4.6"
 embedded-hal = "0.2.3"
 async-trait = "0.1.22"
 
+# We have to override core to support futures in a no-std package
 [dependencies.core]
 package = "core-futures-tls"
 version = "0.1.0"
 optional = true
 
-[dependencies.async-std]
-version = "*"
-optional = true

@@ -15,8 +15,6 @@ extern crate std;
 use std::boxed::Box;
 use async_trait::async_trait;
 
-extern crate async_std;
-
 use embedded_hal::blocking::delay::DelayMs;
 use crate::{Transmit, Receive, Power};
 
