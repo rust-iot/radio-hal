@@ -1,5 +1,22 @@
 language: rust
+
+rust:
+  stable
+  nightly
+
+jobs:
+  include:
+    - rust: stable
+      env: FLAGS=""
+    - rust: nightly
+      env: FLAGS="--all-features"
+
+script:
+  - cargo build $FLAGS
+  - cargo test $FLAGS
+
 notifications:
   email:
     on_success: never
     on_failure: never
+  

@@ -1,3 +1,7 @@
+//! Blocking APIs on top of the base radio traits
+//! 
+//! https://github.com/ryankurte/rust-radio
+//! Copyright 2020 Ryan Kurte
 
 use core::time::Duration;
 
@@ -33,7 +37,8 @@ impl <E> From<E> for BlockingError<E> {
     }
 }
 
-/// Blocking transmit function implemented over `radio::Transmit` and `radio::Power` using the provided `DelayMs` impl to poll for completion
+/// Blocking transmit function implemented over `radio::Transmit` and `radio::Power` using the provided 
+/// `BlockingOptions` and radio-internal `DelayMs` impl to poll for completion
 pub trait BlockingTransmit<E> {
     fn do_transmit(&mut self, data: &[u8], tx_options: BlockingOptions) -> Result<(), BlockingError<E>>;
 }
@@ -72,7 +77,8 @@ where
     }
 }
 
-/// Blocking receive function implemented over `radio::Receive` using the provided `DelayMs` impl to poll for completion
+/// Blocking receive function implemented over `radio::Receive` using the provided `BlockingOptions` 
+/// and radio-internal `DelayMs` impl to poll for completion
 pub trait BlockingReceive<I, E> {
     fn do_receive(&mut self, buff: &mut [u8], info: &mut I, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>>;
 }
@@ -146,3 +152,4 @@ where
 
     }
 }
+

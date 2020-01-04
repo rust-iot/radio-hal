@@ -2,6 +2,9 @@
 
 An [embedded-hal](https://github.com/rust-embedded/embedded-hal) like abstraction for digital radio devices, this is intended to provide a common basis for implementing packet radio drivers, and for extension to support 802.15.4 / BLE etc. in the hope that we can construct embedded network stacks using this common abstraction.
 
+Radio devices should implement the core traits, and then gain automatic [blocking]() helper functions.
+
+Experimental async/await helpers are available behind the `async-await` feature flag, and requires nightly for compilation.
 
 ## Status
 
@@ -18,10 +21,12 @@ An [embedded-hal](https://github.com/rust-embedded/embedded-hal) like abstractio
 
 - [x] Transmit
 - [x] Receive
+- [x] Set Channel
 - [x] Fetch RSSI
 - [x] Register Access
 - [ ] Configuration
 - [ ] 802.15.4
+
 
 ### Examples
 

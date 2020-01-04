@@ -4,10 +4,24 @@ description = "Generic traits for embedded packet radio devices"
 repository = "https://github.com/ryankurte/rust-radio"
 authors = ["Ryan Kurte <ryankurte@gmail.com>"]
 license = "MIT"
+edition = "2018"
 version = "0.4.1"
+
+[features]
+async-await = [ "core", "async-std" ]
+default = []
 
 [dependencies]
 nb = "0.1.2"
 log = "0.4.6"
 embedded-hal = "0.2.3"
+async-trait = "0.1.22"
 
+[dependencies.core]
+package = "core-futures-tls"
+version = "0.1.0"
+optional = true
+
+[dependencies.async-std]
+version = "*"
+optional = true
