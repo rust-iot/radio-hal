@@ -42,6 +42,28 @@ impl <E> From<E> for BlockingError<E> {
 
 /// Blocking transmit function implemented over `radio::Transmit` and `radio::Power` using the provided 
 /// `BlockingOptions` and radio-internal `DelayMs` impl to poll for completion
+#[cfg_attr(feature = "mock", doc = r##"
+```
+# use radio::*;
+# use radio::mock::*;
+use radio::blocking::{BlockingTransmit, BlockingOptions};
+
+# let mut radio = MockRadio::new(&[
+#    Transaction::start_transmit(vec![0xaa, 0xbb], None),
+#    Transaction::check_transmit(Ok(false)),
+#    Transaction::delay_ms(1),
+#    Transaction::check_transmit(Ok(true)),
+# ]);
+# 
+// Transmit using a blocking call
+let res = radio.do_transmit(&[0xaa, 0xbb], BlockingOptions::default());
+
+assert_eq!(res, Ok(()));
+
+# radio.done();
+```
+"##)]
+///
 pub trait BlockingTransmit<E> {
     fn do_transmit(&mut self, data: &[u8], tx_options: BlockingOptions) -> Result<(), BlockingError<E>>;
 }
@@ -82,6 +104,38 @@ where
 
 /// Blocking receive function implemented over `radio::Receive` using the provided `BlockingOptions` 
 /// and radio-internal `DelayMs` impl to poll for completion
+#[cfg_attr(feature = "mock", doc = r##"
+```
+# use radio::*;
+# use radio::mock::*;
+use radio::blocking::{BlockingReceive, BlockingOptions};
+
+let data = [0xaa, 0xbb];
+let info = BasicInfo::new(-81, 0);
+
+
+# let mut radio = MockRadio::new(&[
+#    Transaction::start_receive(None),
+#    Transaction::check_receive(true, Ok(false)),
+#    Transaction::delay_ms(1),
+#    Transaction::check_receive(true, Ok(true)),
+#    Transaction::get_received(Ok((data.to_vec(), info.clone()))),
+# ]);
+# 
+
+let mut buff = [0u8; 128];
+let mut i = BasicInfo::new(0, 0);
+
+// Receive using a blocking call
+let res = radio.do_receive(&mut buff, &mut i, BlockingOptions::default());
+
+assert_eq!(res, Ok(data.len()));
+assert_eq!(&buff[..data.len()], &data);
+
+# radio.done();
+```
+"##)]
+/// 
 pub trait BlockingReceive<I, E> {
     fn do_receive(&mut self, buff: &mut [u8], info: &mut I, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>>;
 }

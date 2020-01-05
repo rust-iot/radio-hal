@@ -10,17 +10,55 @@ extern crate std;
 use std::vec::Vec;
 use std::fmt::Debug;
 
+use embedded_hal::blocking::delay::DelayMs;
+
 extern crate embedded_hal_mock;
 use embedded_hal_mock::common::Generic;
 
 use crate::{State, Transmit, Receive, Power, Channel, Interrupts, BasicInfo};
 
-/// Mock radio implementation
+/// Generic mock radio
 /// 
 /// Based on `embedded_hal_mock::common::Generic`
-pub type Radio<St, Reg, Ch, Inf, Irq, Err> = Generic<Transaction<St, Reg, Ch, Inf, Irq, Err>>;
+#[derive(Debug, Clone)]
+pub struct Radio<
+    St: Debug + Clone + PartialEq, 
+    Reg: Debug + Clone + PartialEq, 
+    Ch: Debug + Clone + PartialEq, 
+    Inf: Debug + Clone + PartialEq, 
+    Irq: Debug + Clone + PartialEq, 
+    E: Debug + Clone + PartialEq
+> {
+    inner: Generic<Transaction<St, Reg, Ch, Inf, Irq, E>>
+}
 
+impl <St, Reg, Ch, Inf, Irq, E> Radio<St, Reg, Ch, Inf, Irq, E> 
+where
+    St: PartialEq + Debug + Clone,
+    Reg: PartialEq + Debug + Clone,
+    Ch: PartialEq + Debug + Clone,
+    Inf: PartialEq + Debug + Clone,
+    Irq: PartialEq + Debug + Clone,
+    E: PartialEq + Debug + Clone,
+{
+    pub fn new(expectations: &[Transaction<St, Reg, Ch, Inf, Irq, E>]) -> Self {
+        let inner = Generic::new(expectations);
+        
+        Self{inner}
+    }
+
+    pub fn next(&mut self) -> Option<Transaction<St, Reg, Ch, Inf, Irq, E>> {
+        self.inner.next()
+    }
+
+    pub fn done(&mut self) {
+        self.inner.done()
+    }
+}
+
+/// Concrete mock radio using mock types
 pub type MockRadio = Radio<MockState, u8, u8, BasicInfo, u8, MockError>;
+
 
 /// MockState for use with mock radio
 #[derive(Debug, Clone, PartialEq)]
@@ -140,6 +178,14 @@ impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
             response: res.map_or_else(Response::Err, Response::Irq),
         }
     }
+
+    /// Delay for a certain time
+    pub fn delay_ms(ms: u32) -> Self {
+        Self {
+            request: Request::DelayMs(ms),
+            response: Response::Ok,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -161,6 +207,8 @@ enum Request<St, Reg, Ch> {
     StartReceive,
     CheckReceive(bool),
     GetReceived,
+
+    DelayMs(u32),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -183,6 +231,21 @@ impl <St, Inf, Irq, E> From<Option<E>> for Response<St, Inf, Irq, E> {
     }
 }
 
+impl <St, Reg, Ch, Inf, Irq, E> DelayMs<u32> for Radio<St, Reg, Ch, Inf, Irq, E> 
+where
+    St: PartialEq + Debug + Clone,
+    Reg: PartialEq + Debug + Clone,
+    Ch: PartialEq + Debug + Clone,
+    Inf: PartialEq + Debug + Clone,
+    Irq: PartialEq + Debug + Clone,
+    E: PartialEq + Debug + Clone,
+{
+    fn delay_ms(&mut self, ms: u32) {
+        let n = self.next().expect("no expectation for delay_ms call");
+
+        assert_eq!(&n.request, &Request::DelayMs(ms));
+    }
+}
 
 impl <St, Reg, Ch, Inf, Irq, E> State for Radio<St, Reg, Ch, Inf, Irq, E> 
 where
