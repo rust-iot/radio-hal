@@ -34,5 +34,3 @@ optional = true
 [dev-dependencies]
 async-std = "1.4.0"
 
-[patch.crates-io]
-embedded-hal-mock = { path = "../embedded-hal-mock" }
