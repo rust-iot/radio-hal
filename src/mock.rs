@@ -1,6 +1,9 @@
-//! Mock radio driver
+//! Mock radio driver for application testing
 //! 
-//! https://github.com/ryankurte/rust-radio
+//! This provides a generic and specific mock implementation of the radio traits
+//! to support network and application level testing.
+//! 
+// https://github.com/ryankurte/rust-radio
 // Copyright 2020 Ryan Kurte
 
 extern crate std;
@@ -29,11 +32,17 @@ pub enum MockState {
 }
 
 
+unsafe impl Send for MockState {}
+
 /// MockError for use with mock radio
 #[derive(Debug, Clone, PartialEq)]
 pub enum MockError {
     Timeout,
 }
+
+unsafe impl Send for MockError {}
+
+impl Unpin for MockError {}
 
 /// Transactions describe interactions with a radio device
 #[derive(Debug, Clone, PartialEq)]
@@ -41,6 +50,9 @@ pub struct Transaction<St, Reg, Ch, Inf, Irq, E> {
     request: Request<St, Reg, Ch>,
     response: Response<St, Inf, Irq, E>,
 }
+
+
+unsafe impl <St, Reg, Ch, Inf, Irq, E>  Send for Transaction <St, Reg, Ch, Inf, Irq, E>  {}
 
 impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
     /// Set the radio state

@@ -9,7 +9,7 @@ version = "0.4.2"
 
 [features]
 async-await = [ "core" ]
-mock = []
+mock = [ "embedded-hal-mock" ]
 default = []
 
 [package.metadata.docs.rs]
@@ -30,3 +30,9 @@ optional = true
 [dependencies.embedded-hal-mock]
 version = "0.7.1"
 optional = true
+
+[dev-dependencies]
+async-std = "1.4.0"
+
+[patch.crates-io]
+embedded-hal-mock = { path = "../embedded-hal-mock" }

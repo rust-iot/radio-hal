@@ -1,7 +1,10 @@
 //! Blocking APIs on top of the base radio traits
 //! 
-//! https://github.com/ryankurte/rust-radio
-//! Copyright 2020 Ryan Kurte
+//! These implementations use the radio's DelayMs implementation to 
+//! poll on completion of operations.
+//! 
+// https://github.com/ryankurte/rust-radio
+// Copyright 2020 Ryan Kurte
 
 use core::time::Duration;
 

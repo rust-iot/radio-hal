@@ -1,10 +1,13 @@
 //! Abstract packet radio interfaces
 //! 
-//! https://github.com/ryankurte/rust-radio
+//! This package defines traits for packet radio devices, as well as blocking and async
+//! implementations using these traits, and a mock device to support application level testing.
+//! 
+// https://github.com/ryankurte/rust-radio
 // Copyright 2020 Ryan Kurte
 
 #![no_std]
-#![deny(unsafe_code)]
+//#![deny(unsafe_code)]
 
 extern crate nb;
 
@@ -13,7 +16,7 @@ extern crate log;
 
 extern crate embedded_hal;
 
-//#[cfg(feature="async-await")]
+#[cfg(feature="async-await")]
 extern crate async_trait;
 
 pub mod blocking;
