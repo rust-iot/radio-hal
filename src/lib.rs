@@ -21,6 +21,9 @@ pub mod blocking;
 #[cfg(feature="async-await")]
 pub mod nonblocking;
 
+#[cfg(feature="mock")]
+pub mod mock;
+
 /// Radio trait combines Base, Configure, Send and Receive for a generic radio object
 pub trait Radio: Transmit + Receive {}
 
@@ -75,6 +78,12 @@ pub struct BasicInfo {
     rssi:   i16,
     /// Link Quality Indicator (LQI) of received packet  
     lqi:    u16,
+}
+
+impl BasicInfo {
+    pub fn new(rssi: i16, lqi: u16) -> Self {
+        Self {rssi, lqi}
+    }
 }
 
 /// Default / Standard radio channel object for radio devices with integer channels
