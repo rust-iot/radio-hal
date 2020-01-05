@@ -31,18 +31,11 @@ pub enum MockState {
     Tx,
 }
 
-
-unsafe impl Send for MockState {}
-
 /// MockError for use with mock radio
 #[derive(Debug, Clone, PartialEq)]
 pub enum MockError {
     Timeout,
 }
-
-unsafe impl Send for MockError {}
-
-impl Unpin for MockError {}
 
 /// Transactions describe interactions with a radio device
 #[derive(Debug, Clone, PartialEq)]
@@ -50,9 +43,6 @@ pub struct Transaction<St, Reg, Ch, Inf, Irq, E> {
     request: Request<St, Reg, Ch>,
     response: Response<St, Inf, Irq, E>,
 }
-
-
-unsafe impl <St, Reg, Ch, Inf, Irq, E>  Send for Transaction <St, Reg, Ch, Inf, Irq, E>  {}
 
 impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
     /// Set the radio state
