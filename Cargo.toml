@@ -9,11 +9,15 @@ version = "0.4.2"
 
 [features]
 async-await = [ "core" ]
+mock = [ "embedded-hal-mock" ]
 default = []
+
+[package.metadata.docs.rs]
+all-features = true
 
 [dependencies]
 nb = "0.1.2"
-log = "0.4.6"
+log = "0.4.8"
 embedded-hal = "0.2.3"
 async-trait = "0.1.22"
 
@@ -22,4 +26,11 @@ async-trait = "0.1.22"
 package = "core-futures-tls"
 version = "0.1.0"
 optional = true
+
+[dependencies.embedded-hal-mock]
+version = "0.7.1"
+optional = true
+
+[dev-dependencies]
+async-std = "1.4.0"
 

@@ -1,10 +1,13 @@
 //! Abstract packet radio interfaces
 //! 
-//! https://github.com/ryankurte/rust-radio
+//! This package defines traits for packet radio devices, as well as blocking and async
+//! implementations using these traits, and a mock device to support application level testing.
+//! 
+// https://github.com/ryankurte/rust-radio
 // Copyright 2020 Ryan Kurte
 
 #![no_std]
-#![deny(unsafe_code)]
+//#![deny(unsafe_code)]
 
 extern crate nb;
 
@@ -13,13 +16,16 @@ extern crate log;
 
 extern crate embedded_hal;
 
-//#[cfg(feature="async-await")]
+#[cfg(feature="async-await")]
 extern crate async_trait;
 
 pub mod blocking;
 
 #[cfg(feature="async-await")]
 pub mod nonblocking;
+
+#[cfg(feature="mock")]
+pub mod mock;
 
 /// Radio trait combines Base, Configure, Send and Receive for a generic radio object
 pub trait Radio: Transmit + Receive {}
@@ -75,6 +81,12 @@ pub struct BasicInfo {
     rssi:   i16,
     /// Link Quality Indicator (LQI) of received packet  
     lqi:    u16,
+}
+
+impl BasicInfo {
+    pub fn new(rssi: i16, lqi: u16) -> Self {
+        Self {rssi, lqi}
+    }
 }
 
 /// Default / Standard radio channel object for radio devices with integer channels

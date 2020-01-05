@@ -1,9 +1,10 @@
-//! Non-blocking APIs on top of the base radio traits
+//! Non-blocking (async/await) APIs on top of the base radio traits
 //! Note that this _requires_ (and will include) std
+//!
 //! 
-//! https://github.com/ryankurte/rust-radio
-//! Copyright 2020 Ryan Kurte
-
+//! 
+//! ## https://github.com/ryankurte/rust-radio
+//! ## Copyright 2020 Ryan Kurte
 
 use core::future::Future;
 use core::marker::PhantomData;
@@ -15,7 +16,6 @@ extern crate std;
 use std::boxed::Box;
 use async_trait::async_trait;
 
-use embedded_hal::blocking::delay::DelayMs;
 use crate::{Transmit, Receive, Power};
 
 pub struct AsyncOptions {
@@ -30,20 +30,47 @@ impl Default for AsyncOptions {
     }
 }
 
-/// Async transmit function implemented over `radio::Transmit` and `radio::Power` using the provided 
-/// `AsyncOptions`
+/// Async transmit function implemented over `radio::Transmit` and `radio::Power` using the provided `AsyncOptions`
+/// 
+#[cfg_attr(feature = "mock", doc = r##"
+```
+extern crate async_std;
+use async_std::task;
+
+# use radio::*;
+# use radio::mock::*;
+use radio::nonblocking::{AsyncTransmit, AsyncOptions};
+
+# let mut radio = MockRadio::new(&[
+#    Transaction::start_transmit(vec![0xaa, 0xbb], None),
+#    Transaction::check_transmit(Ok(false)),
+#    Transaction::check_transmit(Ok(true)),
+# ]);
+# 
+task::block_on(async {
+    // Transmit using a future
+    let res = radio.async_transmit(&[0xaa, 0xbb], AsyncOptions::default()).await;
+    
+    assert_eq!(res, Ok(()));
+});
+
+# radio.done();
+```
+"##)]
+/// 
 #[async_trait]
 pub trait AsyncTransmit<E> {
-    async fn async_transmit(&mut self, data: &[u8], tx_options: AsyncOptions) -> Result<(), E>;
+    async fn async_transmit(&mut self, data: &[u8], tx_options: AsyncOptions) -> Result<(), E> where E: 'async_trait;
 }
 
 #[async_trait]
-impl <T, E: 'static> AsyncTransmit<E> for T
+impl <T, E> AsyncTransmit<E> for T
 where
-    T: Transmit<Error = E> + Power<Error = E> + DelayMs<u32> + Send,
+    T: Transmit<Error = E> + Power<Error = E> + Send,
     E: core::fmt::Debug + Send + Unpin,
 {
-    async fn async_transmit(&mut self, data: &[u8], tx_options: AsyncOptions) -> Result<(), E> {
+    async fn async_transmit(&mut self, data: &[u8], tx_options: AsyncOptions) -> Result<(), E> where E: 'async_trait,
+    {
         // Set output power if specified
         if let Some(p) = tx_options.power {
             self.set_power(p)?;
@@ -63,7 +90,7 @@ where
     }
 }
 
-pub struct TransmitFuture<'a, T, E> {
+struct TransmitFuture<'a, T, E> {
     radio: &'a mut T,
     waker: Option<Waker>,
     _err: PhantomData<E>,
@@ -71,7 +98,7 @@ pub struct TransmitFuture<'a, T, E> {
 
 impl <'a, T, E> Future for TransmitFuture<'a, T, E> 
 where 
-    T: Transmit<Error = E> + Power<Error = E> + DelayMs<u32> + Send,
+    T: Transmit<Error = E> + Power<Error = E> + Send,
     E: core::fmt::Debug + Send + Unpin,
 {
     type Output = Result<(), E>;
@@ -96,21 +123,56 @@ where
     }
 }
 
-/// Async transmit function implemented over `radio::Transmit` and `radio::Power` using the provided 
-/// `AsyncOptions`
+/// Async transmit function implemented over `radio::Transmit` and `radio::Power` using the provided `AsyncOptions`
+/// 
+#[cfg_attr(feature = "mock", doc = r##"
+```
+extern crate async_std;
+use async_std::task;
+
+# use radio::*;
+# use radio::mock::*;
+use radio::nonblocking::{AsyncReceive, AsyncOptions};
+
+let data = [0xaa, 0xbb];
+let info = BasicInfo::new(-81, 0);
+
+# let mut radio = MockRadio::new(&[
+#    Transaction::start_receive(None),
+#    Transaction::check_receive(true, Ok(false)),
+#    Transaction::check_receive(true, Ok(true)),
+#    Transaction::get_received(Ok((data.to_vec(), info.clone()))),
+# ]);
+# 
+task::block_on(async {
+    // Setup buffer and receive info
+    let mut buff = [0u8; 128];
+    let mut i = BasicInfo::new(0, 0);
+
+    // Receive using a future
+    let res = radio.async_receive(&mut i, &mut buff, AsyncOptions::default()).await;
+    
+    assert_eq!(res, Ok(data.len()));
+    assert_eq!(&buff[..data.len()], &data);
+});
+
+# radio.done();
+```
+"##)]
+/// 
 #[async_trait]
 pub trait AsyncReceive<I, E> {
-    async fn async_receive(&mut self, info: &mut I, buff: &mut [u8], rx_options: AsyncOptions) -> Result<usize, E>;
+    async fn async_receive(&mut self, info: &mut I, buff: &mut [u8], rx_options: AsyncOptions) -> Result<usize, E> where E: 'async_trait;
 }
 
 #[async_trait]
-impl <T, I, E: 'static> AsyncReceive<I, E> for T
+impl <T, I, E> AsyncReceive<I, E> for T
 where
-    T: Receive<Error = E, Info = I> + DelayMs<u32> + Send,
+    T: Receive<Error = E, Info = I> + Send,
     I: core::fmt::Debug + Send,
     E: core::fmt::Debug + Send + Unpin,
 {
-    async fn async_receive(&mut self, info: &mut I, buff: &mut [u8], _rx_options: AsyncOptions) -> Result<usize, E> {
+    async fn async_receive(&mut self, info: &mut I, buff: &mut [u8], _rx_options: AsyncOptions) -> Result<usize, E> where E: 'async_trait {
         // Start receive mode
         self.start_receive()?;
 
@@ -127,7 +189,7 @@ where
     }
 }
 
-pub struct ReceiveFuture<'a, T, I, E> {
+struct ReceiveFuture<'a, T, I, E> {
     radio: &'a mut T,
     info: &'a mut I,
     buff: &'a mut [u8],
@@ -137,7 +199,7 @@ pub struct ReceiveFuture<'a, T, I, E> {
 
 impl <'a, T, I, E> Future for ReceiveFuture<'a, T, I, E> 
 where 
-    T: Receive<Error = E, Info = I> + DelayMs<u32> + Send,
+    T: Receive<Error = E, Info = I> + Send,
     I: core::fmt::Debug + Send,
     E: core::fmt::Debug + Send + Unpin,
 {
