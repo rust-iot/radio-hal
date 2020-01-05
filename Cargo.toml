@@ -5,15 +5,15 @@ repository = "https://github.com/ryankurte/rust-radio"
 authors = ["Ryan Kurte <ryankurte@gmail.com>"]
 license = "MIT"
 edition = "2018"
-version = "0.4.2"
+version = "0.4.3"
+
+[package.metadata.docs.rs]
+all-features = true
 
 [features]
 async-await = [ "core" ]
 mock = [ "embedded-hal-mock" ]
 default = []
-
-[package.metadata.docs.rs]
-all-features = true
 
 [dependencies]
 nb = "0.1.2"
