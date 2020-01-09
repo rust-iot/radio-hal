@@ -2,7 +2,7 @@
 
 An [embedded-hal](https://github.com/rust-embedded/embedded-hal) like abstraction for digital radio devices, this is intended to provide a common basis for implementing packet radio drivers, and for extension to support 802.15.4 / BLE etc. in the hope that we can construct embedded network stacks using this common abstraction.
 
-Radio devices should implement the [core traits](https://docs.rs/radio/), and then gain automatic [blocking](https://docs.rs/radio/latest/radio/blocking/index.html) helper functions. Experimental [async/await](https://docs.rs/radio/latest/radio/nonblocking/index.html) helpers are available behind the `async-await` feature flag, this uses [dtolnay/async-trait](https://github.com/dtolnay/async-trait), imports `std`, and requires a nightly compiler, and a `MockRadio` implementation for testing is available behind the `mock` feature flag (also requiring nightly).
+Radio devices should implement the [core traits](https://docs.rs/radio/), and then gain automatic [blocking](https://docs.rs/radio/latest/radio/blocking/index.html) helper functions. Experimental [async/await](https://docs.rs/radio/latest/radio/nonblocking/index.html) helpers are available behind the `async-await` feature flag, this uses [dtolnay/async-trait](https://github.com/dtolnay/async-trait), imports `std` and `async-std`, and requires a nightly compiler, and a `MockRadio` implementation for testing is available behind the `mock` feature flag (also requiring nightly).
 
 
 ## Status

@@ -6,6 +6,7 @@
 //! ## https://github.com/ryankurte/rust-radio
 //! ## Copyright 2020 Ryan Kurte
 
+use core::time::Duration;
 use core::future::Future;
 use core::marker::PhantomData;
 use core::task::{Context, Poll, Waker};
@@ -16,17 +17,36 @@ extern crate std;
 use std::boxed::Box;
 use async_trait::async_trait;
 
+extern crate async_std;
+use async_std::{task};
+
 use crate::{Transmit, Receive, Power};
 
 pub struct AsyncOptions {
     pub power: Option<i8>,
+    pub timeout: Duration,
+    pub poll_period: Duration,
 }
 
 impl Default for AsyncOptions {
     fn default() -> Self {
         Self {            
             power: None,
+            timeout: Duration::from_millis(100),
+            poll_period: Duration::from_millis(1),
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum AsyncError<E> {
+    Inner(E),
+    Timeout,
+}
+
+impl <E> From<E> for AsyncError<E> {
+    fn from(e: E) -> Self {
+        AsyncError::Inner(e)
     }
 }
 
@@ -60,7 +80,7 @@ task::block_on(async {
 /// 
 #[async_trait]
 pub trait AsyncTransmit<E> {
-    async fn async_transmit(&mut self, data: &[u8], tx_options: AsyncOptions) -> Result<(), E> where E: 'async_trait;
+    async fn async_transmit(&mut self, data: &[u8], tx_options: AsyncOptions) -> Result<(), AsyncError<E>> where E: 'async_trait;
 }
 
 #[async_trait]
@@ -69,7 +89,7 @@ where
     T: Transmit<Error = E> + Power<Error = E> + Send,
     E: core::fmt::Debug + Send + Unpin,
 {
-    async fn async_transmit(&mut self, data: &[u8], tx_options: AsyncOptions) -> Result<(), E> where E: 'async_trait,
+    async fn async_transmit(&mut self, data: &[u8], tx_options: AsyncOptions) -> Result<(), AsyncError<E>> where E: 'async_trait,
     {
         // Set output power if specified
         if let Some(p) = tx_options.power {
@@ -80,7 +100,13 @@ where
         self.start_transmit(data)?;
 
         // Create transmit future
-        let f: TransmitFuture<_, E> = TransmitFuture{radio: self, waker: None, _err: PhantomData};
+        let f: TransmitFuture<_, E> = TransmitFuture{
+            radio: self, 
+            waker: None,
+            timeout: tx_options.timeout,
+            period: tx_options.poll_period,
+            _err: PhantomData
+        };
 
         // Await on transmission
         let res = f.await?;
@@ -93,30 +119,42 @@ where
 struct TransmitFuture<'a, T, E> {
     radio: &'a mut T,
     waker: Option<Waker>,
+    timeout: Duration,
+    period: Duration,
     _err: PhantomData<E>,
 }
+
 
 impl <'a, T, E> Future for TransmitFuture<'a, T, E> 
 where 
     T: Transmit<Error = E> + Power<Error = E> + Send,
     E: core::fmt::Debug + Send + Unpin,
 {
-    type Output = Result<(), E>;
+    type Output = Result<(), AsyncError<E>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let s = self.get_mut();
+        let mut s = self.get_mut();
+        let period = s.period.clone();
 
         // Check for completion
         if s.radio.check_transmit()? {
             return Poll::Ready(Ok(()))
         };
         
-        // TODO: we don't _strictly_ need to wake every time?
-        // but for now, we're going to
-        cx.waker().clone().wake();
+        trace!("remaining time: {:?}", s.timeout);
 
-        // Store for later (probably not required with above)
-        s.waker = Some(cx.waker().clone());
+        // Check for timeout
+        match s.timeout.checked_sub(period) {
+            Some(t) => s.timeout = t,
+            None => return Poll::Ready(Err(AsyncError::Timeout))
+        }
+
+        // Spawn task to re-execute waker
+        let waker = cx.waker().clone();
+        task::spawn(async move {
+            task::sleep(period).await;
+            waker.wake();
+        });
 
         // Indicate there is still work to be done
         Poll::Pending
@@ -162,7 +200,7 @@ task::block_on(async {
 /// 
 #[async_trait]
 pub trait AsyncReceive<I, E> {
-    async fn async_receive(&mut self, info: &mut I, buff: &mut [u8], rx_options: AsyncOptions) -> Result<usize, E> where E: 'async_trait;
+    async fn async_receive(&mut self, info: &mut I, buff: &mut [u8], rx_options: AsyncOptions) -> Result<usize, AsyncError<E>> where E: 'async_trait;
 }
 
 #[async_trait]
@@ -172,13 +210,19 @@ where
     I: core::fmt::Debug + Send,
     E: core::fmt::Debug + Send + Unpin,
 {
-    async fn async_receive(&mut self, info: &mut I, buff: &mut [u8], _rx_options: AsyncOptions) -> Result<usize, E> where E: 'async_trait {
+    async fn async_receive(&mut self, info: &mut I, buff: &mut [u8], rx_options: AsyncOptions) -> Result<usize, AsyncError<E>> where E: 'async_trait {
         // Start receive mode
         self.start_receive()?;
 
         // Create receive future
         let f: ReceiveFuture<_, I, E> = ReceiveFuture {
-            radio: self, info, buff, waker: None, _err: PhantomData
+            radio: self, 
+            info, 
+            buff, 
+            waker: None, 
+            timeout: rx_options.timeout,
+            period: rx_options.poll_period,
+            _err: PhantomData
         };
 
         // Await completion
@@ -194,6 +238,8 @@ struct ReceiveFuture<'a, T, I, E> {
     info: &'a mut I,
     buff: &'a mut [u8],
     waker: Option<Waker>,
+    timeout: Duration,
+    period: Duration,
     _err: PhantomData<E>,
 }
 
@@ -203,10 +249,11 @@ where
     I: core::fmt::Debug + Send,
     E: core::fmt::Debug + Send + Unpin,
 {
-    type Output = Result<usize, E>;
+    type Output = Result<usize, AsyncError<E>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let s = self.get_mut();
+        let period = s.period.clone();
 
         // Check for completion
         if s.radio.check_receive(true)? {
@@ -216,12 +263,18 @@ where
             return Poll::Ready(Ok(n));
         }
 
-        // TODO: we don't _strictly_ need to wake every time?
-        // but for now, we're going to
-        cx.waker().clone().wake();
+        // Check for timeout
+        match s.timeout.checked_sub(period) {
+            Some(t) => s.timeout = t,
+            None => return Poll::Ready(Err(AsyncError::Timeout))
+        }
 
-        // Store for later (probably not required with above)
-        s.waker = Some(cx.waker().clone());
+        // Spawn task to re-execute waker
+        let waker = cx.waker().clone();
+        task::spawn(async move {
+            task::sleep(period).await;
+            waker.wake();
+        });
 
         // Indicate there is still work to be done
         Poll::Pending
