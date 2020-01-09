@@ -9,7 +9,7 @@
 use core::time::Duration;
 use core::future::Future;
 use core::marker::PhantomData;
-use core::task::{Context, Poll, Waker};
+use core::task::{Context, Poll};
 use core::pin::Pin;
 
 // std required for async-trait
@@ -24,7 +24,7 @@ use crate::{Transmit, Receive, Power};
 
 pub struct AsyncOptions {
     pub power: Option<i8>,
-    pub timeout: Duration,
+    pub timeout: Option<Duration>,
     pub poll_period: Duration,
 }
 
@@ -32,8 +32,8 @@ impl Default for AsyncOptions {
     fn default() -> Self {
         Self {            
             power: None,
-            timeout: Duration::from_millis(100),
-            poll_period: Duration::from_millis(1),
+            timeout: Some(Duration::from_millis(100)),
+            poll_period: Duration::from_millis(10),
         }
     }
 }
@@ -102,7 +102,6 @@ where
         // Create transmit future
         let f: TransmitFuture<_, E> = TransmitFuture{
             radio: self, 
-            waker: None,
             timeout: tx_options.timeout,
             period: tx_options.poll_period,
             _err: PhantomData
@@ -118,8 +117,7 @@ where
 
 struct TransmitFuture<'a, T, E> {
     radio: &'a mut T,
-    waker: Option<Waker>,
-    timeout: Duration,
+    timeout: Option<Duration>,
     period: Duration,
     _err: PhantomData<E>,
 }
@@ -133,7 +131,7 @@ where
     type Output = Result<(), AsyncError<E>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut s = self.get_mut();
+        let s = self.get_mut();
         let period = s.period.clone();
 
         // Check for completion
@@ -144,9 +142,11 @@ where
         trace!("remaining time: {:?}", s.timeout);
 
         // Check for timeout
-        match s.timeout.checked_sub(period) {
-            Some(t) => s.timeout = t,
-            None => return Poll::Ready(Err(AsyncError::Timeout))
+        if let Some(v) = s.timeout.as_mut() {
+            match v.checked_sub(period) {
+                Some(t) => *v = t,
+                None => return Poll::Ready(Err(AsyncError::Timeout))
+            }
         }
 
         // Spawn task to re-execute waker
@@ -219,7 +219,6 @@ where
             radio: self, 
             info, 
             buff, 
-            waker: None, 
             timeout: rx_options.timeout,
             period: rx_options.poll_period,
             _err: PhantomData
@@ -237,8 +236,7 @@ struct ReceiveFuture<'a, T, I, E> {
     radio: &'a mut T,
     info: &'a mut I,
     buff: &'a mut [u8],
-    waker: Option<Waker>,
-    timeout: Duration,
+    timeout: Option<Duration>,
     period: Duration,
     _err: PhantomData<E>,
 }
@@ -264,9 +262,11 @@ where
         }
 
         // Check for timeout
-        match s.timeout.checked_sub(period) {
-            Some(t) => s.timeout = t,
-            None => return Poll::Ready(Err(AsyncError::Timeout))
+        if let Some(v) = s.timeout.as_mut() {
+            match v.checked_sub(period) {
+                Some(t) => *v = t,
+                None => return Poll::Ready(Err(AsyncError::Timeout))
+            }
         }
 
         // Spawn task to re-execute waker
