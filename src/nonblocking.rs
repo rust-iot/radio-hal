@@ -26,6 +26,9 @@ pub struct AsyncOptions {
     pub power: Option<i8>,
     pub timeout: Option<Duration>,
     pub poll_period: Duration,
+    // Use an async_std timer to wake after a specified duration
+    // TODO: replace this with a callback so it can be generic over waker functions
+    pub wake_fn: bool,
 }
 
 impl Default for AsyncOptions {
@@ -34,6 +37,7 @@ impl Default for AsyncOptions {
             power: None,
             timeout: Some(Duration::from_millis(100)),
             poll_period: Duration::from_millis(10),
+            wake_fn: false,
         }
     }
 }
@@ -104,6 +108,7 @@ where
             radio: self, 
             timeout: tx_options.timeout,
             period: tx_options.poll_period,
+            wake_fn: tx_options.wake_fn,
             _err: PhantomData
         };
 
@@ -119,6 +124,7 @@ struct TransmitFuture<'a, T, E> {
     radio: &'a mut T,
     timeout: Option<Duration>,
     period: Duration,
+    wake_fn: bool,
     _err: PhantomData<E>,
 }
 
@@ -151,10 +157,14 @@ where
 
         // Spawn task to re-execute waker
         let waker = cx.waker().clone();
-        task::spawn(async move {
-            task::sleep(period).await;
+        if !s.wake_fn {
             waker.wake();
-        });
+        } else {
+            task::spawn(async move {
+                task::sleep(period).await;
+                waker.wake();
+            });
+        }
 
         // Indicate there is still work to be done
         Poll::Pending
@@ -221,6 +231,7 @@ where
             buff, 
             timeout: rx_options.timeout,
             period: rx_options.poll_period,
+            wake_fn: rx_options.wake_fn,
             _err: PhantomData
         };
 
@@ -238,6 +249,7 @@ struct ReceiveFuture<'a, T, I, E> {
     buff: &'a mut [u8],
     timeout: Option<Duration>,
     period: Duration,
+    wake_fn: bool,
     _err: PhantomData<E>,
 }
 
@@ -271,10 +283,14 @@ where
 
         // Spawn task to re-execute waker
         let waker = cx.waker().clone();
-        task::spawn(async move {
-            task::sleep(period).await;
+        if !s.wake_fn {
             waker.wake();
-        });
+        } else {
+            task::spawn(async move {
+                task::sleep(period).await;
+                waker.wake();
+            });
+        }
 
         // Indicate there is still work to be done
         Poll::Pending
