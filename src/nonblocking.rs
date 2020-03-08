@@ -12,9 +12,11 @@ use core::marker::PhantomData;
 use core::task::{Context, Poll};
 use core::pin::Pin;
 
-// std required for async-trait
+// std required for async-trait, systemtime
 extern crate std;
 use std::boxed::Box;
+use std::time::SystemTime;
+
 use async_trait::async_trait;
 
 extern crate async_std;
@@ -28,7 +30,7 @@ pub struct AsyncOptions {
     pub poll_period: Duration,
     // Use an async_std timer to wake after a specified duration
     // TODO: replace this with a callback so it can be generic over waker functions
-    pub wake_fn: bool,
+    pub wake_fn: Option<&'static fn(cx: &mut Context, d: Duration)>,
 }
 
 impl Default for AsyncOptions {
@@ -37,7 +39,7 @@ impl Default for AsyncOptions {
             power: None,
             timeout: Some(Duration::from_millis(100)),
             poll_period: Duration::from_millis(10),
-            wake_fn: false,
+            wake_fn: None,
         }
     }
 }
@@ -95,6 +97,9 @@ where
 {
     async fn async_transmit(&mut self, data: &[u8], tx_options: AsyncOptions) -> Result<(), AsyncError<E>> where E: 'async_trait,
     {
+        // Calculate expiry time
+        let expiry = tx_options.timeout.map(|t| SystemTime::now().checked_add(t).unwrap());
+
         // Set output power if specified
         if let Some(p) = tx_options.power {
             self.set_power(p)?;
@@ -106,7 +111,7 @@ where
         // Create transmit future
         let f: TransmitFuture<_, E> = TransmitFuture{
             radio: self, 
-            timeout: tx_options.timeout,
+            expiry,
             period: tx_options.poll_period,
             wake_fn: tx_options.wake_fn,
             _err: PhantomData
@@ -122,9 +127,9 @@ where
 
 struct TransmitFuture<'a, T, E> {
     radio: &'a mut T,
-    timeout: Option<Duration>,
+    expiry: Option<std::time::SystemTime>,
     period: Duration,
-    wake_fn: bool,
+    wake_fn: Option<&'static fn(cx: &mut Context, d: Duration)>,
     _err: PhantomData<E>,
 }
 
@@ -145,25 +150,18 @@ where
             return Poll::Ready(Ok(()))
         };
         
-        trace!("remaining time: {:?}", s.timeout);
-
         // Check for timeout
-        if let Some(v) = s.timeout.as_mut() {
-            match v.checked_sub(period) {
-                Some(t) => *v = t,
-                None => return Poll::Ready(Err(AsyncError::Timeout))
+        if let Some(e) = s.expiry {
+            if SystemTime::now() > e {
+                return Poll::Ready(Err(AsyncError::Timeout))
             }
         }
 
         // Spawn task to re-execute waker
-        let waker = cx.waker().clone();
-        if !s.wake_fn {
-            waker.wake();
+if let Some(w) = s.wake_fn {
+            w(cx, period);
         } else {
-            task::spawn(async move {
-                task::sleep(period).await;
-                waker.wake();
-            });
+            cx.waker().clone().wake();
         }
 
         // Indicate there is still work to be done
@@ -224,12 +222,15 @@ where
         // Start receive mode
         self.start_receive()?;
 
+        // Calculate expiry time
+        let expiry = rx_options.timeout.map(|t| SystemTime::now().checked_add(t).unwrap());
+
         // Create receive future
         let f: ReceiveFuture<_, I, E> = ReceiveFuture {
             radio: self, 
             info, 
             buff, 
-            timeout: rx_options.timeout,
+            expiry,
             period: rx_options.poll_period,
             wake_fn: rx_options.wake_fn,
             _err: PhantomData
@@ -247,9 +248,9 @@ struct ReceiveFuture<'a, T, I, E> {
     radio: &'a mut T,
     info: &'a mut I,
     buff: &'a mut [u8],
-    timeout: Option<Duration>,
+    expiry: Option<std::time::SystemTime>,
     period: Duration,
-    wake_fn: bool,
+    wake_fn: Option<&'static fn(cx: &mut Context, d: Duration)>,
     _err: PhantomData<E>,
 }
 
@@ -274,25 +275,29 @@ where
         }
 
         // Check for timeout
-        if let Some(v) = s.timeout.as_mut() {
-            match v.checked_sub(period) {
-                Some(t) => *v = t,
-                None => return Poll::Ready(Err(AsyncError::Timeout))
+        if let Some(e) = s.expiry {
+            if SystemTime::now() > e {
+                return Poll::Ready(Err(AsyncError::Timeout))
             }
         }
 
         // Spawn task to re-execute waker
-        let waker = cx.waker().clone();
-        if !s.wake_fn {
-            waker.wake();
+if let Some(w) = s.wake_fn {
+            w(cx, period)
         } else {
-            task::spawn(async move {
-                task::sleep(period).await;
-                waker.wake();
-            });
+            cx.waker().clone().wake();
         }
 
         // Indicate there is still work to be done
         Poll::Pending
     }
+}
+
+/// Task waker using async_std task::spawn with a task::sleep
+pub fn async_std_task_waker(cx: &mut Context, period: Duration) {
+    let waker = cx.waker().clone();
+    task::spawn(async move {
+        task::sleep(period).await;
+        waker.wake();
+    });
 }
