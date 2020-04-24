@@ -11,7 +11,7 @@ version = "0.6.0"
 all-features = true
 
 [features]
-async-await = [ "core", "async-std" ]
+async-await = [ "async-std" ]
 mock = [ "embedded-hal-mock" ]
 default = []
 
@@ -21,12 +21,6 @@ log = "0.4.8"
 embedded-hal = "0.2.3"
 async-trait = "0.1.22"
 
-
-# We have to override core to support futures in a no-std package
-[dependencies.core]
-package = "core-futures-tls"
-version = "0.1.0"
-optional = true
 
 [dependencies.embedded-hal-mock]
 version = "0.7.1"
