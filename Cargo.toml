@@ -11,8 +11,9 @@ version = "0.7.0"
 all-features = true
 
 [features]
-async-await = [ "async-std" ]
+async-await = [ ]
 mock = [ "embedded-hal-mock" ]
+all = [ "async-await", "async-std", "mock" ]
 default = []
 
 [dependencies]
@@ -21,6 +22,9 @@ log = "0.4.8"
 embedded-hal = "0.2.3"
 async-trait = "0.1.22"
 
+[dependencies.chrono]
+version = "*"
+default_features = false
 
 [dependencies.embedded-hal-mock]
 version = "0.7.1"
@@ -29,6 +33,8 @@ optional = true
 [dependencies.async-std]
 version = "1.4.0"
 optional = true
+
+
 
 [dev-dependencies]
 async-std = "1.4.0"
