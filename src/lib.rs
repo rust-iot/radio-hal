@@ -7,38 +7,35 @@
 //! ## Copyright 2020 Ryan Kurte
 
 #![no_std]
-#![cfg_attr(feature = "async-await", feature(generic_associated_types))] 
+
+// TODO: not sure i _should_ mask this, but, the warning is annoying
+#![cfg_attr(feature = "nonblocking", allow(incomplete_features))]
+#![cfg_attr(feature = "nonblocking", feature(generic_associated_types))] 
 
 extern crate nb;
-
 extern crate chrono;
-
 #[macro_use]
 extern crate log;
-
 extern crate embedded_hal;
+
 
 #[cfg(feature="async-std")]
 extern crate async_std;
-
 #[cfg(feature="helpers")]
 extern crate humantime;
-
 #[cfg(feature="helpers")]
 extern crate byteorder;
-
+#[cfg(feature="helpers")]
+extern crate rolling_stats;
 #[cfg(feature="std")]
 extern crate std;
 
 
 pub mod blocking;
-
-#[cfg(feature="async-await")]
+#[cfg(feature="nonblocking")]
 pub mod nonblocking;
-
 #[cfg(feature="helpers")]
 pub mod helpers;
-
 #[cfg(feature="mock")]
 pub mod mock;
 

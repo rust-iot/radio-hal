@@ -5,12 +5,10 @@
 
 use structopt::StructOpt;
 use humantime::{Duration as HumanDuration};
-
 use embedded_hal::blocking::delay::DelayUs;
 
 extern crate std;
 use std::prelude::v1::*;
-
 use std::time::{SystemTime};
 use std::fs::{File, OpenOptions};
 use std::ffi::CString;
@@ -19,11 +17,12 @@ use std::string::String;
 use libc::{self};
 
 use pcap_file::{PcapWriter, DataLink, pcap::PcapHeader};
-
 use byteorder::{NetworkEndian, ByteOrder};
+use rolling_stats::Stats;
 
 use crate::{Transmit, Receive, ReceiveInfo, Power, Rssi};
 use crate::blocking::*;
+
 
 /// Basic operations supported by the helpers package
 #[derive(Clone, StructOpt, PartialEq, Debug)]
@@ -41,40 +40,30 @@ pub enum Operation {
     Rssi(RssiOptions),
 
     #[structopt(name="echo")]
-    /// Echo back received messages
+    /// Echo back received messages (useful with Link Test mode)
     Echo(EchoOptions),
+
+    #[structopt(name="ping-pong")]
+    /// Link test (ping-pong) mode
+    LinkTest(PingPongOptions),
 }
 
-pub fn do_operation<T, I, E>(radio: &mut T, operation: Operation) -> Result<(), E> 
+pub fn do_operation<T, I, E>(radio: &mut T, operation: Operation) -> Result<(), BlockingError<E>> 
 where
     T: Transmit<Error=E> + Power<Error=E> + Receive<Info=I, Error=E>  + Rssi<Error=E> + Power<Error=E> + DelayUs<u32>,
     I: ReceiveInfo + Default + std::fmt::Debug,
     E: std::fmt::Debug,
 {
     let mut buff = [0u8; 1024];
+    let mut info = I::default();
 
     // TODO: the rest
     match operation {
-        Operation::Transmit(options) => {
-            do_transmit(radio, options)
-                .expect("Transmit error")
-        },
-        Operation::Receive(options) => {
-            let mut info = I::default();
-
-            do_receive(radio, &mut buff, &mut info, options)
-                .expect("Receive error");
-        },
-        Operation::Echo(options) => {
-            let mut info = I::default();
-
-            do_echo(radio, &mut buff, &mut info, options)
-                .expect("Echo error");
-        }
-        Operation::Rssi(options) => {
-            do_rssi(radio, options)
-                .expect("RSSI error");
-        },
+        Operation::Transmit(options) => do_transmit(radio, options)?,
+        Operation::Receive(options) => do_receive(radio, &mut buff, &mut info, options).map(|_| ())?,
+        Operation::Echo(options) => do_echo(radio, &mut buff, &mut info, options).map(|_| ())?,
+        Operation::Rssi(options) => do_rssi(radio, options).map(|_| ())?,
+        Operation::LinkTest(options) => do_ping_pong(radio, options).map(|_| ())?,
         //_ => warn!("unsuppored command: {:?}", opts.command),
     }
     
@@ -355,4 +344,105 @@ where
         // Wait for poll delay
         radio.delay_us(options.blocking_options.poll_interval.as_micros() as u32);
     }
+}
+
+
+/// Configuration for Echo operation
+#[derive(Clone, StructOpt, PartialEq, Debug)]
+pub struct PingPongOptions {
+    /// Specify the number of rounds to tx/rx
+    #[structopt(long, default_value = "100")]
+    pub rounds: u32,
+
+    /// Power in dBm (range -18dBm to 13dBm)
+    #[structopt(long)]
+    pub power: Option<i8>,
+
+    /// Specify delay for response message
+    #[structopt(long, default_value="100ms")]
+    pub delay: HumanDuration,
+
+    /// Parse RSSI and other info from response messages
+    /// (echo server must have --append-info set)
+    #[structopt(long)]
+    pub parse_info: bool,
+
+    #[structopt(flatten)]
+    pub blocking_options: BlockingOptions,
+}
+
+pub struct LinkTestInfo {
+    pub sent: u32,
+    pub received: u32,
+    pub local_rssi: Stats<f32>,
+    pub remote_rssi: Stats<f32>,
+}
+
+
+pub fn do_ping_pong<T, I, E>(radio: &mut T, options: PingPongOptions) -> Result<LinkTestInfo, BlockingError<E>> 
+where
+    T: Receive<Info=I, Error=E> + Transmit<Error=E> + Power<Error=E> + DelayUs<u32>,
+    I: ReceiveInfo + Default + std::fmt::Debug,
+    E: std::fmt::Debug,
+{
+    let mut link_info = LinkTestInfo{
+        sent: options.rounds,
+        received: 0,
+        local_rssi: Stats::new(),
+        remote_rssi: Stats::new(),
+    };
+
+    let mut info = I::default();
+    let mut buff = [0u8; 32];
+
+     // Set output power if specified
+    if let Some(p) = options.power {
+        radio.set_power(p)?;
+    }
+
+    for i in 0..options.rounds {
+        // Encode message
+        NetworkEndian::write_u32(&mut buff[0..], i as u32);
+        let n = 4;
+
+        debug!("Sending message {}", i);
+
+        // Send message
+        radio.do_transmit(&buff[0..n], options.blocking_options.clone())?;
+
+        // Await response
+        let n = match radio.do_receive(&mut buff, &mut info, options.blocking_options.clone()) {
+            Ok(n) => n,
+            Err(BlockingError::Timeout) => {
+                debug!("Timeout awaiting response {}", i);
+                continue
+            },
+            Err(e) => return Err(e),
+        };
+
+        let receive_index = NetworkEndian::read_u32(&buff[0..n]);
+        if receive_index != i {
+            debug!("Invalid receive index");
+            continue;
+        }
+
+        // Parse info if provided
+        let remote_rssi = match options.parse_info {
+            true => Some(NetworkEndian::read_i16(&buff[4..n])),
+            false => None,
+        };
+
+        debug!("Received response {} with local rssi: {} and remote rssi: {:?}", receive_index, info.rssi(), remote_rssi);
+
+        link_info.received += 1;
+        link_info.local_rssi.update(info.rssi() as f32);
+        if let Some(rssi) = remote_rssi {
+            link_info.remote_rssi.update(rssi as f32);
+        }
+
+        // Wait for send delay
+        radio.delay_us(options.delay.as_micros() as u32);
+    }
+
+    Ok(link_info)
 }

@@ -10,7 +10,6 @@ use core::marker::PhantomData;
 use core::task::{Context, Poll};
 use core::pin::Pin;
 
-
 use crate::{Transmit, Receive, Power};
 
 /// Options for async driver calls

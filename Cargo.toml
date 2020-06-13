@@ -11,11 +11,11 @@ version = "0.7.0"
 all-features = true
 
 [features]
-async-await = [ ]
+nonblocking = [ ]
 mock = [ "embedded-hal-mock" ]
 std = []
-helpers = [ "structopt", "humantime", "std", "pcap-file", "libc", "byteorder" ]
-all = [ "async-await", "async-std", "mock", "helpers" ]
+helpers = [ "structopt", "humantime", "std", "pcap-file", "libc", "byteorder", "rolling-stats" ]
+all = [ "nonblocking", "async-std", "mock", "helpers" ]
 default = []
 
 [dependencies]
@@ -29,6 +29,7 @@ structopt = { version = "0.3.14", optional = true }
 async-std = { version = "1.4.0", optional = true }
 libc = { version = "0.2.71", optional = true }
 byteorder = { version = "1.3.4", optional = true }
+rolling-stats = { version = "0.3.0", optional = true }
 
 
 [dependencies.chrono]
