@@ -20,7 +20,6 @@ default = []
 nb = "0.1.2"
 log = "0.4.8"
 embedded-hal = "0.2.3"
-async-trait = "0.1.22"
 
 [dependencies.chrono]
 version = "*"
