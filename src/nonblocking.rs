@@ -1,8 +1,6 @@
 //! Non-blocking (async/await) APIs on top of the base radio traits
-//! Note that this _requires_ (and will include) std
+//! Note that this _requires_ use of unstable `feature(generic_associated_types)`
 //!
-//! 
-//! 
 //! ## https://github.com/ryankurte/rust-radio
 //! ## Copyright 2020 Ryan Kurte
 
