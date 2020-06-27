@@ -7,17 +7,19 @@
 // Copyright 2020 Ryan Kurte
 
 #![no_std]
-//#![deny(unsafe_code)]
+#![cfg_attr(feature = "async-await", feature(generic_associated_types))] 
 
 extern crate nb;
+
+extern crate chrono;
 
 #[macro_use]
 extern crate log;
 
 extern crate embedded_hal;
 
-#[cfg(feature="async-await")]
-extern crate async_trait;
+#[cfg(feature="async-std")]
+extern crate async_std;
 
 pub mod blocking;
 
