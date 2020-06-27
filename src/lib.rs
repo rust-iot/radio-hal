@@ -19,6 +19,8 @@ extern crate embedded_hal;
 #[cfg(feature="async-await")]
 extern crate async_trait;
 
+pub mod config;
+
 pub mod blocking;
 
 #[cfg(feature="async-await")]
@@ -30,7 +32,10 @@ pub mod mock;
 /// Radio trait combines Base, Configure, Send and Receive for a generic radio object
 pub trait Radio: Transmit + Receive {}
 
-/// Send trait for radios that can transmit packets
+/// Transmit trait for radios that can transmit packets
+/// 
+/// `start_transmit` should be called to load data into the radio, with `check_transmit` called
+/// periodically (or using interrupts) to continue and finalise the transmission.
 pub trait Transmit {
     /// Radio error
     type Error;
@@ -47,6 +52,10 @@ pub trait Transmit {
 }
 
 /// Receive trait for radios that can receive packets
+/// 
+/// `start_receive` should be used to setup the radio in receive mode, with `check_receive` called
+/// periodically (or using interrupts) to poll for packet reception. Once a packet has been received,
+/// `get_received` fetches the received packet (and associated info) from the radio.
 pub trait Receive {
     /// Radio error
     type Error;
@@ -89,7 +98,7 @@ impl BasicInfo {
     }
 }
 
-/// Default / Standard radio channel object for radio devices with integer channels
+/// Default / Standard radio channel object for radio devices with simple integer channels
 #[derive(Debug, Clone, PartialEq)]
 pub struct BasicChannel (pub u16);
 
@@ -103,20 +112,6 @@ impl Into<u16> for BasicChannel {
     fn into(self) -> u16 {
         self.0
     }
-}
-
-/// State trait for configuring radio states
-pub trait State {
-    /// Channel information
-    type State;
-    /// Radio error type
-    type Error;
-
-    /// Set the radio to a specified state
-    fn set_state(&mut self, state: Self::State) -> Result<(), Self::Error>;
-
-    /// Fetch the current radio state
-    fn get_state(&mut self) -> Result<Self::State, Self::Error>;
 }
 
 /// Channel trait for configuring radio channelization
@@ -140,6 +135,8 @@ pub trait Power {
 }
 
 /// Rssi trait allows polling for RSSI on the current channel
+/// 
+/// Note that the radio should be in receive mode prior to polling for this.
 pub trait Rssi {
     /// Radio error
     type Error;
@@ -150,7 +147,29 @@ pub trait Rssi {
     fn poll_rssi(&mut self) -> Result<i16, Self::Error>;
 }
 
-/// Rssi trait allows polling for RSSI on the current channel
+/// State trait for configuring and reading radio states
+/// 
+/// Note that drivers will internally configure and read radio states to manage
+/// radio operations.
+pub trait State {
+    /// Channel information
+    type State;
+    /// Radio error type
+    type Error;
+
+    /// Set the radio to a specified state
+    fn set_state(&mut self, state: Self::State) -> Result<(), Self::Error>;
+
+    /// Fetch the current radio state
+    fn get_state(&mut self) -> Result<Self::State, Self::Error>;
+}
+
+
+/// Interrupts trait allows for reading interrupt state from the device,
+/// as well as configuring interrupt pins.
+/// 
+/// Note that drivers may internally use interrupts and interrupt states
+/// to manage radio operations.
 pub trait Interrupts {
     /// Interrupt object
     type Irq;
@@ -162,7 +181,10 @@ pub trait Interrupts {
     fn get_interrupts(&mut self, clear: bool) -> Result<Self::Irq, Self::Error>;
 }
 
-/// Registers trait provides register level access to the radio device
+/// Registers trait provides register level access to the radio device.
+/// 
+/// This is generally too low level for use by higher abstractions, however,
+/// is provided for completeness.
 pub trait Registers<R: Copy> {
     type Error;
 
