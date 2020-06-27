@@ -1,33 +1,46 @@
 //! Blocking APIs on top of the base radio traits
 //! 
-//! These implementations use the radio's DelayMs implementation to 
+//! These implementations use the radio's DelayUs implementation to 
 //! poll on completion of operations.
 //! 
-// https://github.com/ryankurte/rust-radio
-// Copyright 2020 Ryan Kurte
+//! ## https://github.com/ryankurte/rust-radio
+//! ## Copyright 2020 Ryan Kurte
 
 use core::time::Duration;
 
-use embedded_hal::blocking::delay::DelayMs;
+use embedded_hal::blocking::delay::DelayUs;
 
-use crate::{Transmit, Receive, Power, State};
+#[cfg(feature="structopt")]
+use structopt::StructOpt;
 
+#[cfg(feature="std")]
+use crate::std::string::ToString;
+
+use crate::{Transmit, Receive, State};
+
+/// BlockingOptions for blocking radio functions
+#[derive(Clone, PartialEq, Debug)]
+#[cfg_attr(feature="structopt", derive(StructOpt))]
 pub struct BlockingOptions {
-    pub power: Option<i8>,
+    /// Interval for polling for device state
+    #[cfg_attr(feature="structopt", structopt(long, default_value="100us", parse(try_from_str=crate::duration_from_str)))]
     pub poll_interval: Duration,
+
+    /// Timeout for blocking operation
+    #[cfg_attr(feature="structopt", structopt(long, default_value="100ms", parse(try_from_str=crate::duration_from_str)))]
     pub timeout: Duration,
 }
 
 impl Default for BlockingOptions {
     fn default() -> Self {
         Self {
-            power: None,
-            poll_interval: Duration::from_millis(1),
+            poll_interval: Duration::from_micros(100),
             timeout: Duration::from_millis(100),
         }
     }
 }
 
+/// BlockingError wraps radio error type to provie a `Timeout` variant
 #[derive(Clone, Debug, PartialEq)]
 pub enum BlockingError<E> {
     Inner(E),
@@ -41,7 +54,7 @@ impl <E> From<E> for BlockingError<E> {
 }
 
 /// Blocking transmit function implemented over `radio::Transmit` and `radio::Power` using the provided 
-/// `BlockingOptions` and radio-internal `DelayMs` impl to poll for completion
+/// `BlockingOptions` and radio-internal `DelayUs` impl to poll for completion
 #[cfg_attr(feature = "mock", doc = r##"
 ```
 # use radio::*;
@@ -51,7 +64,7 @@ use radio::blocking::{BlockingTransmit, BlockingOptions};
 # let mut radio = MockRadio::new(&[
 #    Transaction::start_transmit(vec![0xaa, 0xbb], None),
 #    Transaction::check_transmit(Ok(false)),
-#    Transaction::delay_ms(1),
+#    Transaction::delay_us(100),
 #    Transaction::check_transmit(Ok(true)),
 # ]);
 # 
@@ -70,32 +83,31 @@ pub trait BlockingTransmit<E> {
 
 impl <T, E> BlockingTransmit<E> for T
 where 
-    T: Transmit<Error = E> + Power<Error = E> + DelayMs<u32>,
+    T: Transmit<Error = E> + DelayUs<u32>,
     E: core::fmt::Debug,
 {
     fn do_transmit(&mut self, data: &[u8], tx_options: BlockingOptions) -> Result<(), BlockingError<E>> {
-        // Set output power if specified
-        if let Some(p) = tx_options.power {
-            self.set_power(p)?;
-        }
-
+        // Enter transmit mode
         self.start_transmit(data)?;
 
-        let t = tx_options.timeout.as_millis();
+        let t = tx_options.timeout.as_micros();
         let mut c = 0;
         loop {
+            // Check for transmit complete
             if self.check_transmit()? {
                 debug!("Blocking send complete");
                 break;
             }
             
-            c += tx_options.poll_interval.as_millis();
+            // Update poll time and timeout if overrun
+            c += tx_options.poll_interval.as_micros();
             if c > t {
                 debug!("Blocking send timeout");
                 return Err(BlockingError::Timeout)
             }
 
-            self.delay_ms(tx_options.poll_interval.as_millis() as u32);
+            // Wait for next poll
+            self.delay_us(tx_options.poll_interval.as_micros() as u32);
         }
 
         Ok(())
@@ -103,7 +115,7 @@ where
 }
 
 /// Blocking receive function implemented over `radio::Receive` using the provided `BlockingOptions` 
-/// and radio-internal `DelayMs` impl to poll for completion
+/// and radio-internal `DelayUs` impl to poll for completion
 #[cfg_attr(feature = "mock", doc = r##"
 ```
 # use radio::*;
@@ -117,7 +129,7 @@ let info = BasicInfo::new(-81, 0);
 # let mut radio = MockRadio::new(&[
 #    Transaction::start_receive(None),
 #    Transaction::check_receive(true, Ok(false)),
-#    Transaction::delay_ms(1),
+#    Transaction::delay_us(100),
 #    Transaction::check_receive(true, Ok(true)),
 #    Transaction::get_received(Ok((data.to_vec(), info.clone()))),
 # ]);
@@ -142,7 +154,7 @@ pub trait BlockingReceive<I, E> {
 
 impl <T, I, E> BlockingReceive<I, E> for T 
 where
-    T: Receive<Info=I, Error=E> + DelayMs<u32>,
+    T: Receive<Info=I, Error=E> + DelayUs<u32>,
     I: core::fmt::Debug,
     E: core::fmt::Debug,
 {
@@ -150,7 +162,7 @@ where
         // Start receive mode
         self.start_receive()?;
 
-        let t = rx_options.timeout.as_millis();
+        let t = rx_options.timeout.as_micros();
         let mut c = 0;
         loop {
             if self.check_receive(true)? {
@@ -158,13 +170,13 @@ where
                 return Ok(n)
             }
 
-            c += rx_options.poll_interval.as_millis();
+            c += rx_options.poll_interval.as_micros();
             if c > t {
                 debug!("Blocking receive timeout");
                 return Err(BlockingError::Timeout)
             }
 
-            self.delay_ms(rx_options.poll_interval.as_millis() as u32);
+            self.delay_us(rx_options.poll_interval.as_micros() as u32);
         }
     }
 }
@@ -176,7 +188,7 @@ pub trait BlockingSetState<S, E> {
 
 impl <T, S, E>BlockingSetState<S, E> for T 
 where 
-    T: State<State=S, Error=E> + DelayMs<u32>,
+    T: State<State=S, Error=E> + DelayUs<u32>,
     S: core::fmt::Debug + core::cmp::PartialEq + Copy,
     E: core::fmt::Debug,
 {
@@ -184,7 +196,7 @@ where
         // Send set state command
         self.set_state(state)?;
 
-        let t = options.timeout.as_millis();
+        let t = options.timeout.as_micros();
         let mut c = 0;
 
         loop {
@@ -197,14 +209,14 @@ where
             }
 
             // Timeout eventually
-            c += options.poll_interval.as_millis();
+            c += options.poll_interval.as_micros();
             if c > t {
                 debug!("Blocking receive timeout");
                 return Err(BlockingError::Timeout)
             }
 
             // Delay before next loop
-            self.delay_ms(options.poll_interval.as_millis() as u32);
+            self.delay_us(options.poll_interval.as_micros() as u32);
         }
 
     }

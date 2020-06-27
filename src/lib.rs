@@ -3,29 +3,39 @@
 //! This package defines traits for packet radio devices, as well as blocking and async
 //! implementations using these traits, and a mock device to support application level testing.
 //! 
-// https://github.com/ryankurte/rust-radio
-// Copyright 2020 Ryan Kurte
+//! ## https://github.com/ryankurte/rust-radio
+//! ## Copyright 2020 Ryan Kurte
 
 #![no_std]
-#![cfg_attr(feature = "async-await", feature(generic_associated_types))] 
+
+// TODO: not sure i _should_ mask this, but, the warning is annoying
+#![cfg_attr(feature = "nonblocking", allow(incomplete_features))]
+#![cfg_attr(feature = "nonblocking", feature(generic_associated_types))] 
 
 extern crate nb;
-
 extern crate chrono;
-
 #[macro_use]
 extern crate log;
-
 extern crate embedded_hal;
+
 
 #[cfg(feature="async-std")]
 extern crate async_std;
+#[cfg(feature="helpers")]
+extern crate humantime;
+#[cfg(feature="helpers")]
+extern crate byteorder;
+#[cfg(feature="helpers")]
+extern crate rolling_stats;
+#[cfg(feature="std")]
+extern crate std;
+
 
 pub mod blocking;
-
-#[cfg(feature="async-await")]
+#[cfg(feature="nonblocking")]
 pub mod nonblocking;
-
+#[cfg(feature="helpers")]
+pub mod helpers;
 #[cfg(feature="mock")]
 pub mod mock;
 
@@ -75,6 +85,11 @@ pub trait Receive {
     fn get_received(&mut self, info: &mut Self::Info, buff: &mut [u8]) -> Result<usize, Self::Error>;
 }
 
+/// ReceiveInfo trait for receive information objects
+pub trait ReceiveInfo {
+    fn rssi(&self) -> i16;
+}
+
 /// Default / Standard packet information structure for radio devices that provide only rssi 
 /// and lqi information
 #[derive(Debug, Clone, PartialEq)]
@@ -88,6 +103,12 @@ pub struct BasicInfo {
 impl BasicInfo {
     pub fn new(rssi: i16, lqi: u16) -> Self {
         Self {rssi, lqi}
+    }
+}
+
+impl ReceiveInfo for BasicInfo {
+    fn rssi(&self) -> i16 {
+        self.rssi
     }
 }
 
@@ -181,4 +202,13 @@ pub trait Registers<R: Copy> {
         self.reg_write(reg, updated)?;
         Ok(updated)
     }
+}
+
+#[cfg(feature="structopt")]
+use crate::std::str::FromStr;
+
+#[cfg(feature="structopt")]
+fn duration_from_str(s: &str) -> Result<core::time::Duration, humantime::DurationError> {
+    let d = humantime::Duration::from_str(s)?;
+    Ok(*d)
 }
