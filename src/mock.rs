@@ -3,14 +3,14 @@
 //! This provides a generic and specific mock implementation of the radio traits
 //! to support network and application level testing.
 //! 
-// https://github.com/ryankurte/rust-radio
-// Copyright 2020 Ryan Kurte
+//! ## https://github.com/ryankurte/rust-radio
+//! ## Copyright 2020 Ryan Kurte
 
 extern crate std;
 use std::vec::Vec;
 use std::fmt::Debug;
 
-use embedded_hal::blocking::delay::DelayMs;
+use embedded_hal::blocking::delay::DelayUs;
 
 extern crate embedded_hal_mock;
 use embedded_hal_mock::common::Generic;
@@ -180,9 +180,9 @@ impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
     }
 
     /// Delay for a certain time
-    pub fn delay_ms(ms: u32) -> Self {
+    pub fn delay_us(ms: u32) -> Self {
         Self {
-            request: Request::DelayMs(ms),
+            request: Request::DelayUs(ms),
             response: Response::Ok,
         }
     }
@@ -208,7 +208,7 @@ enum Request<St, Reg, Ch> {
     CheckReceive(bool),
     GetReceived,
 
-    DelayMs(u32),
+    DelayUs(u32),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -231,7 +231,7 @@ impl <St, Inf, Irq, E> From<Option<E>> for Response<St, Inf, Irq, E> {
     }
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> DelayMs<u32> for Radio<St, Reg, Ch, Inf, Irq, E> 
+impl <St, Reg, Ch, Inf, Irq, E> DelayUs<u32> for Radio<St, Reg, Ch, Inf, Irq, E> 
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
@@ -240,10 +240,10 @@ where
     Irq: PartialEq + Debug + Clone,
     E: PartialEq + Debug + Clone,
 {
-    fn delay_ms(&mut self, ms: u32) {
-        let n = self.next().expect("no expectation for delay_ms call");
+    fn delay_us(&mut self, ms: u32) {
+        let n = self.next().expect("no expectation for delay_us call");
 
-        assert_eq!(&n.request, &Request::DelayMs(ms));
+        assert_eq!(&n.request, &Request::DelayUs(ms));
     }
 }
 
