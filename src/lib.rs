@@ -42,7 +42,7 @@ pub mod helpers;
 pub mod mock;
 
 /// Radio trait combines Base, Configure, Send and Receive for a generic radio object
-pub trait Radio: Transmit + Receive {}
+pub trait Radio: Transmit + Receive + State {}
 
 /// Transmit trait for radios that can transmit packets
 /// 
@@ -112,6 +112,15 @@ pub struct BasicInfo {
     lqi:    u16,
 }
 
+impl Default for BasicInfo {
+    fn default() -> Self {
+        Self {
+            rssi: core::i16::MIN,
+            lqi: core::u16::MIN,
+        }
+    }
+}
+
 impl BasicInfo {
     pub fn new(rssi: i16, lqi: u16) -> Self {
         Self {rssi, lqi}
@@ -179,7 +188,7 @@ pub trait Rssi {
 /// Note that drivers will internally configure and read radio states to manage
 /// radio operations.
 pub trait State {
-    /// Channel information
+    /// Radio state
     type State;
     /// Radio error type
     type Error;
@@ -191,6 +200,16 @@ pub trait State {
     fn get_state(&mut self) -> Result<Self::State, Self::Error>;
 }
 
+/// Busy trait for checking whether the radio is currently busy
+/// and should not be interrupted
+pub trait Busy {
+    /// Radio error type
+    type Error;
+
+    /// Indicates the radio is busy in the current state
+    /// (for example, currently transmitting or receiving)
+    fn is_busy(&mut self) -> Result<bool, Self::Error>;
+}
 
 /// Interrupts trait allows for reading interrupt state from the device,
 /// as well as configuring interrupt pins.

@@ -15,7 +15,7 @@ use embedded_hal::blocking::delay::DelayUs;
 extern crate embedded_hal_mock;
 use embedded_hal_mock::common::Generic;
 
-use crate::{State, Transmit, Receive, Power, Channel, Interrupts, BasicInfo};
+use crate::{State, Busy, Transmit, Receive, Power, Channel, Rssi, Interrupts, BasicInfo};
 
 /// Generic mock radio
 /// 
@@ -47,6 +47,10 @@ where
         Self{inner}
     }
 
+    pub fn expect(&mut self, expectations: &[Transaction<St, Reg, Ch, Inf, Irq, E>]) {
+        self.inner.expect(expectations);
+    }
+
     pub fn next(&mut self) -> Option<Transaction<St, Reg, Ch, Inf, Irq, E>> {
         self.inner.next()
     }
@@ -65,8 +69,9 @@ pub type MockRadio = Radio<MockState, u8, u8, BasicInfo, u8, MockError>;
 pub enum MockState {
     Idle,
     Sleep,
-    Rx,
-    Tx,
+    Receive,
+    Receiving,
+    Transmitting,
 }
 
 /// MockError for use with mock radio
@@ -96,6 +101,14 @@ impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
         Self {
             request: Request::GetState,
             response: res.map_or_else(Response::Err, Response::State),
+        }
+    }
+
+    /// Check whether radio is currently busy
+    pub fn is_busy(res: Result<bool, E>) -> Self {
+        Self {
+            request: Request::IsBusy,
+            response: res.map_or_else(Response::Err, Response::Bool),
         }
     }
 
@@ -179,6 +192,14 @@ impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
         }
     }
 
+    /// Poll for RSSI
+    pub fn poll_rssi(res: Result<i16, E>) -> Self {
+        Self {
+            request: Request::PollRssi,
+            response: res.map_or_else(Response::Err, Response::Rssi),
+        }
+    }
+
     /// Delay for a certain time
     pub fn delay_us(ms: u32) -> Self {
         Self {
@@ -192,11 +213,13 @@ impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
 enum Request<St, Reg, Ch> {
     SetState(St),
     GetState,
+    IsBusy,
 
     SetRegister(Reg, u8),
     GetRegister,
 
     GetIrq(bool),
+    PollRssi,
 
     SetChannel(Ch),
     SetPower(i8),
@@ -217,6 +240,7 @@ enum Response<St, Inf, Irq, E> {
     State(St),
     Register(u8),
     Irq(Irq),
+    Rssi(i16),
     Received(Vec<u8>, Inf),
     Bool(bool),
     Err(E),
@@ -262,27 +286,64 @@ where
     fn set_state(&mut self, state: Self::State) -> Result<(), Self::Error> {
         let n = self.next().expect("no expectation for State::set_state call");
 
-        assert_eq!(&n.request, &Request::SetState(state));
+        assert_eq!(&n.request, &Request::SetState(state.clone()));
 
-        match &n.response {
+        let res = match &n.response {
             Response::Ok => Ok(()),
             Response::Err(e) => Err(e.clone()),
             _ => unreachable!(),
-        }
+        };
+
+        debug!("Set state: {:?}: {:?}", state, res);
+
+        res
     }
 
     fn get_state(&mut self) -> Result<Self::State, Self::Error> {
+        
         let n = self.next().expect("no expectation for State::get_state call");
 
         assert_eq!(&n.request, &Request::GetState);
 
-        match &n.response {
+        let res = match &n.response {
             Response::Err(e) => Err(e.clone()),
             Response::State(s) => Ok(s.clone()),
             _ => unreachable!(),
-        }
+        };
+
+        debug!("Get state {:?}", res);
+
+        res
     }
 
+}
+
+impl <St, Reg, Ch, Inf, Irq, E> Busy for Radio<St, Reg, Ch, Inf, Irq, E> 
+where
+    St: PartialEq + Debug + Clone,
+    Reg: PartialEq + Debug + Clone,
+    Ch: PartialEq + Debug + Clone,
+    Inf: PartialEq + Debug + Clone,
+    Irq: PartialEq + Debug + Clone,
+    E: PartialEq + Debug + Clone,
+{
+    type Error = E;
+
+    fn is_busy(&mut self) -> Result<bool, Self::Error> {
+        let n = self.next().expect("no expectation for is_busy call");
+
+        assert_eq!(&n.request, &Request::IsBusy);
+
+        let res = match &n.response {
+            Response::Err(e) => Err(e.clone()),
+            Response::Bool(s) => Ok(s.clone()),
+            _ => unreachable!(),
+        };
+
+        debug!("Is busy {:?}", res);
+
+        res
+    }
 }
 
 impl <St, Reg, Ch, Inf, Irq, E> Channel for Radio<St, Reg, Ch, Inf, Irq, E> 
@@ -298,6 +359,8 @@ where
     type Error = E;
 
     fn set_channel(&mut self, channel: &Self::Channel) -> Result<(), Self::Error> {
+        debug!("Set channel {:?}", channel);
+
         let n = self.next().expect("no expectation for State::set_channel call");
 
         assert_eq!(&n.request, &Request::SetChannel(channel.clone()));
@@ -322,6 +385,8 @@ where
     type Error = E;
 
     fn set_power(&mut self, power: i8) -> Result<(), Self::Error> {
+        debug!("Set power {:?}", power);
+
         let n = self.next().expect("no expectation for Power::set_power call");
 
         assert_eq!(&n.request, &Request::SetPower(power));
@@ -331,6 +396,34 @@ where
             Response::Err(e) => Err(e.clone()),
             _ => unreachable!(),
         }
+    }
+}
+
+impl <St, Reg, Ch, Inf, Irq, E> Rssi for Radio<St, Reg, Ch, Inf, Irq, E> 
+where
+    St: PartialEq + Debug + Clone,
+    Reg: PartialEq + Debug + Clone,
+    Ch: PartialEq + Debug + Clone,
+    Inf: PartialEq + Debug + Clone,
+    Irq: PartialEq + Debug + Clone,
+    E: PartialEq + Debug + Clone,
+{
+    type Error = E;
+
+    fn poll_rssi(&mut self) -> Result<i16, Self::Error> {
+        let n = self.next().expect("no expectation for Rssi::poll_rssi call");
+
+        assert_eq!(&n.request, &Request::PollRssi);
+
+        let res = match &n.response {
+            Response::Rssi(v) => Ok(v.clone()),
+            Response::Err(e) => Err(e.clone()),
+            _ => unreachable!(),
+        };
+
+        debug!("Poll RSSI {:?}", res);
+
+        res
     }
 }
 
@@ -351,11 +444,15 @@ where
 
         assert_eq!(&n.request, &Request::GetIrq(clear));
 
-        match &n.response {
+        let res = match &n.response {
             Response::Irq(v) => Ok(v.clone()),
             Response::Err(e) => Err(e.clone()),
             _ => unreachable!(),
-        }
+        };
+
+        debug!("Get Interrupts {:?}", res);
+
+        res
     }
 }
 
@@ -375,11 +472,15 @@ where
 
         assert_eq!(&n.request, &Request::StartTransmit(data.to_vec()));
 
-        match &n.response {
+        let res = match &n.response {
             Response::Ok => Ok(()),
             Response::Err(e) => Err(e.clone()),
             _ => unreachable!(),
-        }
+        };
+
+        debug!("Start transmit {:?}: {:?}", data, res);
+
+        res
     }
 
     fn check_transmit(&mut self) -> Result<bool, Self::Error> {
@@ -387,11 +488,15 @@ where
 
         assert_eq!(&n.request, &Request::CheckTransmit);
 
-        match &n.response {
+        let res = match &n.response {
             Response::Bool(v) => Ok(*v),
             Response::Err(e) => Err(e.clone()),
             _ => unreachable!(),
-        }
+        };
+
+        debug!("Check transmit {:?}", res);
+
+        res
     }
 }
 
@@ -412,11 +517,15 @@ where
 
         assert_eq!(&n.request, &Request::StartReceive);
 
-        match &n.response {
+        let res = match &n.response {
             Response::Ok => Ok(()),
             Response::Err(e) => Err(e.clone()),
             _ => unreachable!(),
-        }
+        };
+
+        debug!("Start receive {:?}", res);
+
+        res
     }
 
     fn check_receive(&mut self, restart: bool) -> Result<bool, Self::Error> {
@@ -424,11 +533,15 @@ where
 
         assert_eq!(&n.request, &Request::CheckReceive(restart));
 
-        match &n.response {
+        let res = match &n.response {
             Response::Bool(v) => Ok(*v),
             Response::Err(e) => Err(e.clone()),
             _ => unreachable!(),
-        }
+        };
+
+        debug!("Check receive {:?}", res);
+
+        res
     }
 
     fn get_received(&mut self, info: &mut Self::Info, buff: &mut [u8]) -> Result<usize, Self::Error> {
@@ -436,7 +549,7 @@ where
 
         assert_eq!(&n.request, &Request::GetReceived);
 
-        match &n.response {
+        let res = match &n.response {
             Response::Received(d, i) => {
                 &mut buff[..d.len()].copy_from_slice(&d);
                 *info = i.clone();
@@ -445,7 +558,11 @@ where
             },
             Response::Err(e) => Err(e.clone()),
             _ => unreachable!(),
-        }
+        };
+
+        debug!("Get received {:?}", res);
+
+        res
     }
 }
 

@@ -107,7 +107,7 @@ where
             }
 
             // Wait for next poll
-            self.delay_us(tx_options.poll_interval.as_micros() as u32);
+            self.try_delay_us(tx_options.poll_interval.as_micros() as u32);
         }
 
         Ok(())
@@ -176,7 +176,7 @@ where
                 return Err(BlockingError::Timeout)
             }
 
-            self.delay_us(rx_options.poll_interval.as_micros() as u32);
+            self.try_delay_us(rx_options.poll_interval.as_micros() as u32);
         }
     }
 }
@@ -216,7 +216,7 @@ where
             }
 
             // Delay before next loop
-            self.delay_us(options.poll_interval.as_micros() as u32);
+            self.try_delay_us(options.poll_interval.as_micros() as u32);
         }
 
     }
