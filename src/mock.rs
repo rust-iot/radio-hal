@@ -9,6 +9,7 @@
 extern crate std;
 use std::vec::Vec;
 use std::fmt::Debug;
+use std::convert::Infallible;
 
 use embedded_hal::blocking::delay::DelayUs;
 
@@ -264,10 +265,14 @@ where
     Irq: PartialEq + Debug + Clone,
     E: PartialEq + Debug + Clone,
 {
-    fn delay_us(&mut self, ms: u32) {
+    type Error = Infallible;
+
+    fn try_delay_us(&mut self, ms: u32) -> Result<(), Self::Error> {
         let n = self.next().expect("no expectation for delay_us call");
 
         assert_eq!(&n.request, &Request::DelayUs(ms));
+
+        Ok(())
     }
 }
 

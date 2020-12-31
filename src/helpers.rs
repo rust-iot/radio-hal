@@ -50,7 +50,7 @@ pub enum Operation {
 
 pub fn do_operation<T, I, E>(radio: &mut T, operation: Operation) -> Result<(), BlockingError<E>> 
 where
-    T: Transmit<Error=E> + Power<Error=E> + Receive<Info=I, Error=E>  + Rssi<Error=E> + Power<Error=E> + DelayUs<u32>,
+    T: Transmit<Error=E> + Power<Error=E> + Receive<Info=I, Error=E>  + Rssi<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
     I: ReceiveInfo + Default + std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -91,7 +91,7 @@ pub struct TransmitOptions {
 
 pub fn do_transmit<T, E>(radio: &mut T, options: TransmitOptions) -> Result<(), BlockingError<E>> 
 where
-    T: Transmit<Error=E> + Power<Error=E> + DelayUs<u32>,
+    T: Transmit<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
     E: core::fmt::Debug,
 {
     // Set output power if specified
@@ -105,7 +105,7 @@ where
 
         // Delay for repeated transmission or exit
         match &options.period {
-            Some(p) => radio.delay_us(p.as_micros() as u32),
+            Some(p) => radio.try_delay_us(p.as_micros() as u32).unwrap(),
             None => break,
         }
     }
@@ -203,8 +203,9 @@ impl PcapOptions {
 /// Receive from the radio using the provided configuration
 pub fn do_receive<T, I, E>(radio: &mut T, mut buff: &mut [u8], mut info: &mut I, options: ReceiveOptions) -> Result<usize, E> 
 where
-    T: Receive<Info=I, Error=E> + DelayUs<u32>,
+    T: Receive<Info=I, Error=E> + DelayUs<u32, Error=E>,
     I: std::fmt::Debug,
+    E: std::fmt::Debug,
 {
     // Create and open pcap file for writing
     let mut pcap_writer = options.pcap_options.open().expect("Error opening pcap file / pipe");
@@ -234,7 +235,7 @@ where
             radio.start_receive()?;
         }
 
-        radio.delay_us(options.blocking_options.poll_interval.as_micros() as u32);
+        radio.try_delay_us(options.blocking_options.poll_interval.as_micros() as u32).unwrap();
     }
 }
 
@@ -252,8 +253,9 @@ pub struct RssiOptions {
 
 pub fn do_rssi<T, I, E>(radio: &mut T, options: RssiOptions) -> Result<(), E> 
 where
-    T: Receive<Info=I, Error=E> + Rssi<Error=E> + DelayUs<u32>,
+    T: Receive<Info=I, Error=E> + Rssi<Error=E> + DelayUs<u32, Error=E>,
     I: std::fmt::Debug,
+    E: std::fmt::Debug,
 {
     // Enter receive mode
     radio.start_receive()?;
@@ -266,7 +268,7 @@ where
 
         radio.check_receive(true)?;
 
-        radio.delay_us(options.period.as_micros() as u32);
+        radio.try_delay_us(options.period.as_micros() as u32).unwrap();
 
         if !options.continuous {
             break
@@ -302,7 +304,7 @@ pub struct EchoOptions {
 
 pub fn do_echo<T, I, E>(radio: &mut T, mut buff: &mut [u8], mut info: &mut I, options: EchoOptions) -> Result<usize, BlockingError<E>> 
 where
-    T: Receive<Info=I, Error=E> + Transmit<Error=E> + Power<Error=E> + DelayUs<u32>,
+    T: Receive<Info=I, Error=E> + Transmit<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
     I: ReceiveInfo + std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -332,7 +334,7 @@ where
             }
 
             // Wait for turnaround delay
-            radio.delay_us(options.delay.as_micros() as u32);
+            radio.try_delay_us(options.delay.as_micros() as u32).unwrap();
 
             // Transmit respobnse
             radio.do_transmit(&buff[..n], options.blocking_options.clone())?;
@@ -342,7 +344,7 @@ where
         }
 
         // Wait for poll delay
-        radio.delay_us(options.blocking_options.poll_interval.as_micros() as u32);
+        radio.try_delay_us(options.blocking_options.poll_interval.as_micros() as u32).unwrap();
     }
 }
 
@@ -381,7 +383,7 @@ pub struct LinkTestInfo {
 
 pub fn do_ping_pong<T, I, E>(radio: &mut T, options: PingPongOptions) -> Result<LinkTestInfo, BlockingError<E>> 
 where
-    T: Receive<Info=I, Error=E> + Transmit<Error=E> + Power<Error=E> + DelayUs<u32>,
+    T: Receive<Info=I, Error=E> + Transmit<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
     I: ReceiveInfo + Default + std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -441,7 +443,7 @@ where
         }
 
         // Wait for send delay
-        radio.delay_us(options.delay.as_micros() as u32);
+        radio.try_delay_us(options.delay.as_micros() as u32).unwrap();
     }
 
     Ok(link_info)
