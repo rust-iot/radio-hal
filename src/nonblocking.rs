@@ -85,29 +85,34 @@ assert_eq!(res, Ok(()));
 pub trait DefaultAsyncTransmit<'a, E>: Transmit<Error = E> + Power<Error = E> + 'a {}
 
 /// AsyncTransmit function provides an async implementation for transmitting packets 
-pub trait AsyncTransmit<'a, E> {
+pub trait AsyncTransmit<'a, B, E> {
     type Output: Future<Output=Result<(), AsyncError<E>>>;
 
-    fn async_transmit(&'a mut self, data: &'a [u8], tx_options: AsyncOptions) -> Result<Self::Output, E>;
+    fn async_transmit(&'a mut self, data: B, tx_options: AsyncOptions) -> Result<Self::Output, E>;
 }
 
 
 /// Future object containing a radio for transmit operation
-pub struct TransmitFuture<'a, T, E> {
+pub struct TransmitFuture<'a, B, T, E> {
     radio: &'a mut T,
+    _data: B,
     options: AsyncOptions,
     _err: PhantomData<E>,
 }
 
-/// `AsyncTransmit` object for all `Transmit` devices
-impl <'a, T, E> AsyncTransmit<'a, E> for T
+/// Basic `AsyncTransmit` impl for all `Transmit` capable devices
+///
+/// This does not manage FIFO streaming as this cannot (yet) be specified using
+/// the nonblocking API. Opt-in to using this by implementing `DefaultAsyncTransmit` 
+impl <'a, B, T, E> AsyncTransmit<'a, B, E> for T
 where
+    B: AsRef<[u8]> + Unpin + 'a,
     T: DefaultAsyncTransmit<'a, E>,
     E: core::fmt::Debug + Unpin,
 {
-    type Output = TransmitFuture<'a, T, E>;
+    type Output = TransmitFuture<'a, B, T, E>;
 
-    fn async_transmit(&'a mut self, data: &'a [u8], tx_options: AsyncOptions) -> Result<Self::Output, E>
+    fn async_transmit(&'a mut self, data: B, tx_options: AsyncOptions) -> Result<Self::Output, E>
     {
         // Set output power if specified
         if let Some(p) = tx_options.power {
@@ -115,11 +120,12 @@ where
         }
 
         // Start transmission
-        self.start_transmit(data)?;
+        self.start_transmit(data.as_ref())?;
 
         // Create transmit future
-        let f: TransmitFuture<_, E> = TransmitFuture{
-            radio: self, 
+        let f: TransmitFuture<B, _, E> = TransmitFuture{
+            radio: self,
+            _data: data,
             options: tx_options,
             _err: PhantomData
         };
@@ -128,8 +134,9 @@ where
     }
 }
 
-impl <'a, T, E> Future for TransmitFuture<'a, T, E> 
-where 
+impl <'a, B, T, E> Future for TransmitFuture<'a, B, T, E> 
+where
+    B: AsRef<[u8]> + Unpin + 'a,
     T: Transmit<Error = E> + Power<Error = E>,
     E: core::fmt::Debug + Unpin,
 {
@@ -199,37 +206,41 @@ assert_eq!(&buff[..data.len()], &data);
 pub trait DefaultAsyncReceive<'a, I, E>: Receive<Error = E, Info = I> + 'a {} 
 
 /// AsyncReceive trait support futures-based polling on receive
-pub trait AsyncReceive<'a, I, E> {
+pub trait AsyncReceive<'a, B, I, E> {
     type Output: Future<Output=Result<usize, AsyncError<E>>>;
 
-    fn async_receive(&'a mut self, info: &'a mut I, buff: &'a mut [u8], rx_options: AsyncOptions) -> Result<Self::Output, E>;
+    fn async_receive(&'a mut self, info: &'a mut I, buff: B, rx_options: AsyncOptions) -> Result<Self::Output, E>;
 }
 
 /// Receive future wraps a radio and buffer to provide a pollable future for receiving packets
-pub struct ReceiveFuture<'a, T, I, E> {
+pub struct ReceiveFuture<'a, B, T, I, E> {
     radio: &'a mut T,
     info: &'a mut I,
-    buff: &'a mut [u8],
+    buff: B,
     options: AsyncOptions,
     _err: PhantomData<E>,
 }
 
 
-/// Generic implementation of `AsyncReceive` for all `Receive` capable radio devices
-impl <'a, T, I, E> AsyncReceive<'a, I, E> for T
+/// Basic `AsyncReceive` impl for all `Receive` capable devices
+///
+/// This does not manage FIFO streaming as this cannot (yet) be specified using
+/// the nonblocking API. Opt-in to using this by implementing `DefaultAsyncTransmit` 
+impl <'a, B, T, I, E> AsyncReceive<'a, B, I, E> for T
 where
+    B: AsRef<[u8]> + AsMut<[u8]> + Unpin + 'a,
     T: DefaultAsyncReceive<'a, I, E>,
     I: core::fmt::Debug + 'a,
     E: core::fmt::Debug + Unpin,
 {
-    type Output = ReceiveFuture<'a, T, I, E>;
+    type Output = ReceiveFuture<'a, B, T, I, E>;
 
-    fn async_receive(&'a mut self, info: &'a mut I, buff: &'a mut [u8], rx_options: AsyncOptions) -> Result<Self::Output, E> {
+    fn async_receive(&'a mut self, info: &'a mut I, buff: B, rx_options: AsyncOptions) -> Result<Self::Output, E> {
         // Start receive mode
         self.start_receive()?;
 
         // Create receive future
-        let f: ReceiveFuture<_, I, E> = ReceiveFuture {
+        let f: ReceiveFuture<B, _, I, E> = ReceiveFuture {
             radio: self, 
             info, 
             buff, 
@@ -241,8 +252,9 @@ where
     }
 }
 
-impl <'a, T, I, E> Future for ReceiveFuture<'a, T, I, E> 
+impl <'a, B, T, I, E> Future for ReceiveFuture<'a, B, T, I, E> 
 where 
+    B: AsRef<[u8]> + AsMut<[u8]> + Unpin + 'a,
     T: Receive<Error = E, Info = I>,
     I: core::fmt::Debug,
     E: core::fmt::Debug + Unpin,
@@ -255,7 +267,7 @@ where
         // Check for completion
         if s.radio.check_receive(true)? {
             // Retrieve data
-            let n = s.radio.get_received(s.info, s.buff)?;
+            let n = s.radio.get_received(s.info, s.buff.as_mut())?;
 
             return Poll::Ready(Ok(n));
         }
