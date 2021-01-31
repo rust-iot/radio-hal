@@ -1,4 +1,6 @@
-//! Non-blocking (async/await) APIs on top of the base radio traits
+//! Basic / example on-blocking (async/await) APIs on top of the base radio traits
+//!
+//! Opt-in via DefaultAsyncTransmit or DefaultAsyncReceive.
 //! Note that this _requires_ use of unstable `feature(generic_associated_types)`
 //!
 //! ## https://github.com/ryankurte/rust-radio
