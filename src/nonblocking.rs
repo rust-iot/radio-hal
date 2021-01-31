@@ -81,6 +81,9 @@ assert_eq!(res, Ok(()));
 ```
 "##)]
 
+/// Marker trait to use default async transmit impl
+pub trait DefaultAsyncTransmit<'a, E>: Transmit<Error = E> + Power<Error = E> + 'a {}
+
 /// AsyncTransmit function provides an async implementation for transmitting packets 
 pub trait AsyncTransmit<'a, E> {
     type Output: Future<Output=Result<(), AsyncError<E>>>;
@@ -99,7 +102,7 @@ pub struct TransmitFuture<'a, T, E> {
 /// `AsyncTransmit` object for all `Transmit` devices
 impl <'a, T, E> AsyncTransmit<'a, E> for T
 where
-    T: Transmit<Error = E> + Power<Error = E> + 'a,
+    T: DefaultAsyncTransmit<'a, E>,
     E: core::fmt::Debug + Unpin,
 {
     type Output = TransmitFuture<'a, T, E>;
@@ -124,7 +127,6 @@ where
         Ok(f)
     }
 }
-
 
 impl <'a, T, E> Future for TransmitFuture<'a, T, E> 
 where 
@@ -193,6 +195,9 @@ assert_eq!(&buff[..data.len()], &data);
 ```
 "##)]
 
+/// Marker trait to use default async receive impl
+pub trait DefaultAsyncReceive<'a, I, E>: Receive<Error = E, Info = I> + 'a {} 
+
 /// AsyncReceive trait support futures-based polling on receive
 pub trait AsyncReceive<'a, I, E> {
     type Output: Future<Output=Result<usize, AsyncError<E>>>;
@@ -213,7 +218,7 @@ pub struct ReceiveFuture<'a, T, I, E> {
 /// Generic implementation of `AsyncReceive` for all `Receive` capable radio devices
 impl <'a, T, I, E> AsyncReceive<'a, I, E> for T
 where
-    T: Receive<Error = E, Info = I> + 'a,
+    T: DefaultAsyncReceive<'a, I, E>,
     I: core::fmt::Debug + 'a,
     E: core::fmt::Debug + Unpin,
 {
