@@ -75,6 +75,16 @@ pub enum MockState {
     Transmitting,
 }
 
+impl crate::RadioState for MockState {
+    fn idle() -> Self {
+        Self::Idle
+    }
+
+    fn sleep() -> Self {
+        Self::Sleep
+    }
+}
+
 /// MockError for use with mock radio
 #[derive(Debug, Clone, PartialEq)]
 pub enum MockError {

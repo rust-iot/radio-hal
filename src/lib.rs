@@ -190,6 +190,12 @@ pub trait State {
     fn get_state(&mut self) -> Result<Self::State, Self::Error>;
 }
 
+pub trait RadioState {
+    fn idle() -> Self;
+
+    fn sleep() -> Self;
+}
+
 /// Busy trait for checking whether the radio is currently busy
 /// and should not be interrupted
 pub trait Busy {
