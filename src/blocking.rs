@@ -8,7 +8,7 @@
 
 use core::time::Duration;
 
-use embedded_hal::blocking::delay::DelayUs;
+use embedded_hal::delay::blocking::DelayUs;
 
 #[cfg(feature="structopt")]
 use structopt::StructOpt;
@@ -107,7 +107,7 @@ where
             }
 
             // Wait for next poll
-            let _ = self.try_delay_us(tx_options.poll_interval.as_micros() as u32);
+            let _ = self.delay_us(tx_options.poll_interval.as_micros() as u32);
         }
 
         Ok(())
@@ -176,7 +176,7 @@ where
                 return Err(BlockingError::Timeout)
             }
 
-            let _ = self.try_delay_us(rx_options.poll_interval.as_micros() as u32);
+            let _ = self.delay_us(rx_options.poll_interval.as_micros() as u32);
         }
     }
 }
@@ -216,7 +216,7 @@ where
             }
 
             // Delay before next loop
-            let _ = self.try_delay_us(options.poll_interval.as_micros() as u32);
+            let _ = self.delay_us(options.poll_interval.as_micros() as u32);
         }
 
     }
