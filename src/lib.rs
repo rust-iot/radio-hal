@@ -32,20 +32,20 @@ pub mod helpers;
 pub mod mock;
 
 /// Radio trait combines Base, Configure, Send and Receive for a generic radio object
-pub trait Radio: Transmit + Receive + State {}
+pub trait Radio<P>: Transmit<P> + Receive<P> + State {}
 
 /// Transmit trait for radios that can transmit packets
 /// 
 /// `start_transmit` should be called to load data into the radio, with `check_transmit` called
 /// periodically (or using interrupts) to continue and finalise the transmission.
-pub trait Transmit {
+pub trait Transmit<P> {
     /// Radio error
     type Error;
 
     /// Start sending a packet on the provided channel
     /// 
     /// Returns an error if send was not started
-    fn start_transmit(&mut self, data: &[u8]) -> Result<(), Self::Error>;
+    fn start_transmit(&mut self, data: &[u8], params: &P) -> Result<(), Self::Error>;
 
     /// Check for send completion
     /// 
@@ -58,7 +58,7 @@ pub trait Transmit {
 /// `start_receive` should be used to setup the radio in receive mode, with `check_receive` called
 /// periodically (or using interrupts) to poll for packet reception. Once a packet has been received,
 /// `get_received` fetches the received packet (and associated info) from the radio.
-pub trait Receive {
+pub trait Receive<P> {
     /// Radio error
     type Error;
     /// Packet received info
@@ -67,7 +67,7 @@ pub trait Receive {
     /// Set receiving on the specified channel
     /// 
     /// Returns an error if receive mode was not entered
-    fn start_receive(&mut self) -> Result<(), Self::Error>;
+    fn start_receive(&mut self, params: &P) -> Result<(), Self::Error>;
 
     /// Check for reception
     /// 

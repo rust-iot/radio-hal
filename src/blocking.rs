@@ -77,18 +77,18 @@ assert_eq!(res, Ok(()));
 ```
 "##)]
 ///
-pub trait BlockingTransmit<E> {
-    fn do_transmit(&mut self, data: &[u8], tx_options: BlockingOptions) -> Result<(), BlockingError<E>>;
+pub trait BlockingTransmit<P, E> {
+    fn do_transmit(&mut self, data: &[u8], params: &P, tx_options: BlockingOptions) -> Result<(), BlockingError<E>>;
 }
 
-impl <T, E> BlockingTransmit<E> for T
+impl <T, P, E> BlockingTransmit<P, E> for T
 where 
-    T: Transmit<Error = E> + DelayUs<u32>,
+    T: Transmit<P, Error = E> + DelayUs<u32>,
     E: core::fmt::Debug,
 {
-    fn do_transmit(&mut self, data: &[u8], tx_options: BlockingOptions) -> Result<(), BlockingError<E>> {
+    fn do_transmit(&mut self, data: &[u8], params: &P, tx_options: BlockingOptions) -> Result<(), BlockingError<E>> {
         // Enter transmit mode
-        self.start_transmit(data)?;
+        self.start_transmit(data, params)?;
 
         let t = tx_options.timeout.as_micros();
         let mut c = 0;
@@ -148,19 +148,19 @@ assert_eq!(&buff[..data.len()], &data);
 ```
 "##)]
 /// 
-pub trait BlockingReceive<I, E> {
-    fn do_receive(&mut self, buff: &mut [u8], info: &mut I, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>>;
+pub trait BlockingReceive<P, I, E> {
+    fn do_receive(&mut self, buff: &mut [u8], params: &P, info: &mut I, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>>;
 }
 
-impl <T, I, E> BlockingReceive<I, E> for T 
+impl <T, P, I, E> BlockingReceive<P, I, E> for T
 where
-    T: Receive<Info=I, Error=E> + DelayUs<u32>,
+    T: Receive<P, Info=I, Error=E> + DelayUs<u32>,
     I: core::fmt::Debug,
     E: core::fmt::Debug,
 {
-    fn do_receive(&mut self, buff: &mut [u8], info: &mut I, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>> {
+    fn do_receive(&mut self, buff: &mut [u8], params: &P, info: &mut I, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>> {
         // Start receive mode
-        self.start_receive()?;
+        self.start_receive(params)?;
 
         let t = rx_options.timeout.as_micros();
         let mut c = 0;
