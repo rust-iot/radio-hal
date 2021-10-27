@@ -1,11 +1,11 @@
 //! Provides common helpers for implementing radio utilities
-//! 
+//!
 //! ## https://github.com/ryankurte/rust-radio
 //! ## Copyright 2020 Ryan Kurte
 
 use structopt::StructOpt;
 use humantime::{Duration as HumanDuration};
-use embedded_hal::blocking::delay::DelayUs;
+use embedded_hal::delay::blocking::DelayUs;
 
 extern crate std;
 use std::prelude::v1::*;
@@ -48,9 +48,9 @@ pub enum Operation {
     LinkTest(PingPongOptions),
 }
 
-pub fn do_operation<T, I, E>(radio: &mut T, operation: Operation) -> Result<(), BlockingError<E>> 
+pub fn do_operation<T, P, I, E>(radio: &mut T, operation: Operation, params: &P) -> Result<(), BlockingError<E>>
 where
-    T: Transmit<Error=E> + Power<Error=E> + Receive<Info=I, Error=E>  + Rssi<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
+    T: Transmit<P, Error=E> + Power<Error=E> + Receive<P, Info=I, Error=E>  + Rssi<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
     I: ReceiveInfo + Default + std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -59,14 +59,14 @@ where
 
     // TODO: the rest
     match operation {
-        Operation::Transmit(options) => do_transmit(radio, options)?,
-        Operation::Receive(options) => do_receive(radio, &mut buff, &mut info, options).map(|_| ())?,
-        Operation::Echo(options) => do_echo(radio, &mut buff, &mut info, options).map(|_| ())?,
-        Operation::Rssi(options) => do_rssi(radio, options).map(|_| ())?,
-        Operation::LinkTest(options) => do_ping_pong(radio, options).map(|_| ())?,
+        Operation::Transmit(options) => do_transmit(radio, params, options)?,
+        Operation::Receive(options) => do_receive(radio, &mut buff, params, &mut info, options).map(|_| ())?,
+        Operation::Echo(options) => do_echo(radio, &mut buff, params, &mut info, options).map(|_| ())?,
+        Operation::Rssi(options) => do_rssi(radio, params, options).map(|_| ())?,
+        Operation::LinkTest(options) => do_ping_pong(radio, params, options).map(|_| ())?,
         //_ => warn!("unsuppored command: {:?}", opts.command),
     }
-    
+
     Ok(())
 }
 
@@ -89,9 +89,9 @@ pub struct TransmitOptions {
     pub blocking_options: BlockingOptions,
 }
 
-pub fn do_transmit<T, E>(radio: &mut T, options: TransmitOptions) -> Result<(), BlockingError<E>> 
+pub fn do_transmit<T, P, E>(radio: &mut T, params: &P, options: TransmitOptions) -> Result<(), BlockingError<E>>
 where
-    T: Transmit<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
+    T: Transmit<P, Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
     E: core::fmt::Debug,
 {
     // Set output power if specified
@@ -101,11 +101,11 @@ where
 
     loop {
         // Transmit packet
-        radio.do_transmit(&options.data, options.blocking_options.clone())?;
+        radio.do_transmit(&options.data, params, options.blocking_options.clone())?;
 
         // Delay for repeated transmission or exit
         match &options.period {
-            Some(p) => radio.try_delay_us(p.as_micros() as u32).unwrap(),
+            Some(p) => radio.delay_us(p.as_micros() as u32).unwrap(),
             None => break,
         }
     }
@@ -154,28 +154,28 @@ impl PcapOptions {
             (None, Some(pipe)) => {
                 // Ensure file doesn't already exist
                 let _ = std::fs::remove_file(pipe);
-    
+
                 // Create pipe
                 let n = CString::new(pipe.as_str()).unwrap();
                 let status = unsafe { libc::mkfifo(n.as_ptr(), 0o644) };
-    
+
                 // Manual status code handling
                 // TODO: return io::Error
                 if status != 0 {
                     panic!("Error creating fifo: {}", status);
                 }
-    
+
                 // Open pipe
                 let f = OpenOptions::new()
                     .write(true)
                     .open(pipe)
                     .expect("Error opening PCAP pipe");
-    
+
                 Some(f)
             }
 
             (None, None) => None,
-            
+
             _ => unimplemented!()
         };
 
@@ -201,9 +201,9 @@ impl PcapOptions {
 }
 
 /// Receive from the radio using the provided configuration
-pub fn do_receive<T, I, E>(radio: &mut T, mut buff: &mut [u8], mut info: &mut I, options: ReceiveOptions) -> Result<usize, E> 
+pub fn do_receive<T, P, I, E>(radio: &mut T, mut buff: &mut [u8], params: &P, mut info: &mut I, options: ReceiveOptions) -> Result<usize, E>
 where
-    T: Receive<Info=I, Error=E> + DelayUs<u32, Error=E>,
+    T: Receive<P, Info=I, Error=E> + DelayUs<u32, Error=E>,
     I: std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -211,7 +211,7 @@ where
     let mut pcap_writer = options.pcap_options.open().expect("Error opening pcap file / pipe");
 
     // Start receive mode
-    radio.start_receive()?;
+    radio.start_receive(params)?;
 
     loop {
         if radio.check_receive(true)? {
@@ -224,18 +224,18 @@ where
 
             if let Some(p) = &mut pcap_writer {
                 let t = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
-                
+
                 p.write(t.as_secs() as u32, t.as_nanos() as u32 % 1_000_000, &buff[0..n], n as u32).expect("Error writing pcap file");
             }
-            
-            if !options.continuous { 
+
+            if !options.continuous {
                 return Ok(n)
             }
 
-            radio.start_receive()?;
+            radio.start_receive(params)?;
         }
 
-        radio.try_delay_us(options.blocking_options.poll_interval.as_micros() as u32).unwrap();
+        radio.delay_us(options.blocking_options.poll_interval.as_micros() as u32).unwrap();
     }
 }
 
@@ -251,14 +251,14 @@ pub struct RssiOptions {
     pub continuous: bool,
 }
 
-pub fn do_rssi<T, I, E>(radio: &mut T, options: RssiOptions) -> Result<(), E> 
+pub fn do_rssi<T, P, I, E>(radio: &mut T, params: &P, options: RssiOptions) -> Result<(), E>
 where
-    T: Receive<Info=I, Error=E> + Rssi<Error=E> + DelayUs<u32, Error=E>,
+    T: Receive<P, Info=I, Error=E> + Rssi<Error=E> + DelayUs<u32, Error=E>,
     I: std::fmt::Debug,
     E: std::fmt::Debug,
 {
     // Enter receive mode
-    radio.start_receive()?;
+    radio.start_receive(params)?;
 
     // Poll for RSSI
     loop {
@@ -268,7 +268,7 @@ where
 
         radio.check_receive(true)?;
 
-        radio.try_delay_us(options.period.as_micros() as u32).unwrap();
+        radio.delay_us(options.period.as_micros() as u32).unwrap();
 
         if !options.continuous {
             break
@@ -284,7 +284,7 @@ pub struct EchoOptions {
     /// Run continuously
     #[structopt(long = "continuous")]
     pub continuous: bool,
-    
+
     /// Power in dBm (range -18dBm to 13dBm)
     #[structopt(long = "power")]
     pub power: Option<i8>,
@@ -302,9 +302,9 @@ pub struct EchoOptions {
 }
 
 
-pub fn do_echo<T, I, E>(radio: &mut T, mut buff: &mut [u8], mut info: &mut I, options: EchoOptions) -> Result<usize, BlockingError<E>> 
+pub fn do_echo<T, P, I, E>(radio: &mut T, mut buff: &mut [u8], params: &P, mut info: &mut I, options: EchoOptions) -> Result<usize, BlockingError<E>>
 where
-    T: Receive<Info=I, Error=E> + Transmit<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
+    T: Receive<P, Info=I, Error=E> + Transmit<P, Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
     I: ReceiveInfo + std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -314,7 +314,7 @@ where
     }
 
     // Start receive mode
-    radio.start_receive()?;
+    radio.start_receive(params)?;
 
     loop {
         if radio.check_receive(true)? {
@@ -334,17 +334,17 @@ where
             }
 
             // Wait for turnaround delay
-            radio.try_delay_us(options.delay.as_micros() as u32).unwrap();
+            radio.delay_us(options.delay.as_micros() as u32).unwrap();
 
             // Transmit respobnse
-            radio.do_transmit(&buff[..n], options.blocking_options.clone())?;
-            
+            radio.do_transmit(&buff[..n], params, options.blocking_options.clone())?;
+
             // Exit if non-continuous
             if !options.continuous { return Ok(n) }
         }
 
         // Wait for poll delay
-        radio.try_delay_us(options.blocking_options.poll_interval.as_micros() as u32).unwrap();
+        radio.delay_us(options.blocking_options.poll_interval.as_micros() as u32).unwrap();
     }
 }
 
@@ -381,9 +381,9 @@ pub struct LinkTestInfo {
 }
 
 
-pub fn do_ping_pong<T, I, E>(radio: &mut T, options: PingPongOptions) -> Result<LinkTestInfo, BlockingError<E>> 
+pub fn do_ping_pong<T, P, I, E>(radio: &mut T, params: &P, options: PingPongOptions) -> Result<LinkTestInfo, BlockingError<E>>
 where
-    T: Receive<Info=I, Error=E> + Transmit<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
+    T: Receive<P, Info=I, Error=E> + Transmit<P, Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
     I: ReceiveInfo + Default + std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -410,10 +410,10 @@ where
         debug!("Sending message {}", i);
 
         // Send message
-        radio.do_transmit(&buff[0..n], options.blocking_options.clone())?;
+        radio.do_transmit(&buff[0..n], params, options.blocking_options.clone())?;
 
         // Await response
-        let n = match radio.do_receive(&mut buff, &mut info, options.blocking_options.clone()) {
+        let n = match radio.do_receive(&mut buff, params, &mut info, options.blocking_options.clone()) {
             Ok(n) => n,
             Err(BlockingError::Timeout) => {
                 debug!("Timeout awaiting response {}", i);
@@ -443,7 +443,7 @@ where
         }
 
         // Wait for send delay
-        radio.try_delay_us(options.delay.as_micros() as u32).unwrap();
+        radio.delay_us(options.delay.as_micros() as u32).unwrap();
     }
 
     Ok(link_info)
