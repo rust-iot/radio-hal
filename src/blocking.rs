@@ -60,6 +60,7 @@ impl <E> From<E> for BlockingError<E> {
 # use radio::*;
 # use radio::mock::*;
 use radio::blocking::{BlockingTransmit, BlockingOptions};
+use radio::params::Basic;
 
 # let mut radio = MockRadio::new(&[
 #    Transaction::start_transmit(vec![0xaa, 0xbb], None),
@@ -69,7 +70,7 @@ use radio::blocking::{BlockingTransmit, BlockingOptions};
 # ]);
 # 
 // Transmit using a blocking call
-let res = radio.do_transmit(&[0xaa, 0xbb], BlockingOptions::default());
+let res = radio.do_transmit(&[0xaa, 0xbb], &Basic, BlockingOptions::default());
 
 assert_eq!(res, Ok(()));
 
@@ -121,6 +122,7 @@ where
 # use radio::*;
 # use radio::mock::*;
 use radio::blocking::{BlockingReceive, BlockingOptions};
+use radio::params::Basic;
 
 let data = [0xaa, 0xbb];
 let info = BasicInfo::new(-81, 0);
@@ -136,10 +138,11 @@ let info = BasicInfo::new(-81, 0);
 # 
 
 let mut buff = [0u8; 128];
+let params = Basic;
 let mut i = BasicInfo::new(0, 0);
 
 // Receive using a blocking call
-let res = radio.do_receive(&mut buff, &mut i, BlockingOptions::default());
+let res = radio.do_receive(&mut buff, &params, &mut i, BlockingOptions::default());
 
 assert_eq!(res, Ok(data.len()));
 assert_eq!(&buff[..data.len()], &data);

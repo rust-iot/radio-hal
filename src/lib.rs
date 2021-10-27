@@ -16,13 +16,14 @@ extern crate log;
 
 extern crate embedded_hal;
 
-
 #[cfg(feature="std")]
 extern crate std;
 
 pub mod config;
 
 pub mod blocking;
+
+pub mod params;
 
 #[cfg(feature="nonblocking")]
 pub mod nonblocking;
