@@ -17,6 +17,7 @@ use structopt::StructOpt;
 use crate::std::string::ToString;
 
 use crate::{Transmit, Receive, State};
+use crate::params::Param;
 
 /// BlockingOptions for blocking radio functions
 #[derive(Clone, PartialEq, Debug)]
@@ -151,17 +152,17 @@ assert_eq!(&buff[..data.len()], &data);
 ```
 "##)]
 /// 
-pub trait BlockingReceive<P, I, E> {
-    fn do_receive(&mut self, buff: &mut [u8], params: &P, info: &mut I, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>>;
+pub trait BlockingReceive<P: Param, E> {
+    fn do_receive(&mut self, buff: &mut [u8], params: &P, info: &mut P::Info, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>>;
 }
 
-impl <T, P, I, E> BlockingReceive<P, I, E> for T
+impl <T, P, E> BlockingReceive<P, E> for T
 where
-    T: Receive<P, Info=I, Error=E> + DelayUs<u32>,
-    I: core::fmt::Debug,
+    T: Receive<P, Error=E> + DelayUs<u32>,
+    P: Param,
     E: core::fmt::Debug,
 {
-    fn do_receive(&mut self, buff: &mut [u8], params: &P, info: &mut I, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>> {
+    fn do_receive(&mut self, buff: &mut [u8], params: &P, info: &mut P::Info, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>> {
         // Start receive mode
         self.start_receive(params)?;
 

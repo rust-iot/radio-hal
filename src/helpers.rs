@@ -22,6 +22,7 @@ use rolling_stats::Stats;
 
 use crate::{Transmit, Receive, ReceiveInfo, Power, Rssi};
 use crate::blocking::*;
+use crate::params::Param;
 
 
 /// Basic operations supported by the helpers package
@@ -48,14 +49,15 @@ pub enum Operation {
     LinkTest(PingPongOptions),
 }
 
-pub fn do_operation<T, P, I, E>(radio: &mut T, operation: Operation, params: &P) -> Result<(), BlockingError<E>>
+pub fn do_operation<T, P, E>(radio: &mut T, operation: Operation, params: &P) -> Result<(), BlockingError<E>>
 where
-    T: Transmit<P, Error=E> + Power<Error=E> + Receive<P, Info=I, Error=E>  + Rssi<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
-    I: ReceiveInfo + Default + std::fmt::Debug,
+    T: Transmit<P, Error=E> + Power<Error=E> + Receive<P, Error=E>  + Rssi<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
+    P: Param,
+    P::Info: Default,
     E: std::fmt::Debug,
 {
     let mut buff = [0u8; 1024];
-    let mut info = I::default();
+    let mut info = P::Info::default();
 
     // TODO: the rest
     match operation {
@@ -201,10 +203,10 @@ impl PcapOptions {
 }
 
 /// Receive from the radio using the provided configuration
-pub fn do_receive<T, P, I, E>(radio: &mut T, mut buff: &mut [u8], params: &P, mut info: &mut I, options: ReceiveOptions) -> Result<usize, E>
+pub fn do_receive<T, P, E>(radio: &mut T, mut buff: &mut [u8], params: &P, mut info: &mut P::Info, options: ReceiveOptions) -> Result<usize, E>
 where
-    T: Receive<P, Info=I, Error=E> + DelayUs<u32, Error=E>,
-    I: std::fmt::Debug,
+    T: Receive<P, Error=E> + DelayUs<u32, Error=E>,
+    P: Param,
     E: std::fmt::Debug,
 {
     // Create and open pcap file for writing
@@ -251,10 +253,10 @@ pub struct RssiOptions {
     pub continuous: bool,
 }
 
-pub fn do_rssi<T, P, I, E>(radio: &mut T, params: &P, options: RssiOptions) -> Result<(), E>
+pub fn do_rssi<T, P, E>(radio: &mut T, params: &P, options: RssiOptions) -> Result<(), E>
 where
-    T: Receive<P, Info=I, Error=E> + Rssi<Error=E> + DelayUs<u32, Error=E>,
-    I: std::fmt::Debug,
+    T: Receive<P, Error=E> + Rssi<Error=E> + DelayUs<u32, Error=E>,
+    P: Param,
     E: std::fmt::Debug,
 {
     // Enter receive mode
@@ -302,10 +304,10 @@ pub struct EchoOptions {
 }
 
 
-pub fn do_echo<T, P, I, E>(radio: &mut T, mut buff: &mut [u8], params: &P, mut info: &mut I, options: EchoOptions) -> Result<usize, BlockingError<E>>
+pub fn do_echo<T, P, E>(radio: &mut T, mut buff: &mut [u8], params: &P, mut info: &mut P::Info, options: EchoOptions) -> Result<usize, BlockingError<E>>
 where
-    T: Receive<P, Info=I, Error=E> + Transmit<P, Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
-    I: ReceiveInfo + std::fmt::Debug,
+    T: Receive<P, Error=E> + Transmit<P, Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
+    P: Param,
     E: std::fmt::Debug,
 {
      // Set output power if specified
@@ -381,10 +383,11 @@ pub struct LinkTestInfo {
 }
 
 
-pub fn do_ping_pong<T, P, I, E>(radio: &mut T, params: &P, options: PingPongOptions) -> Result<LinkTestInfo, BlockingError<E>>
+pub fn do_ping_pong<T, P, E>(radio: &mut T, params: &P, options: PingPongOptions) -> Result<LinkTestInfo, BlockingError<E>>
 where
-    T: Receive<P, Info=I, Error=E> + Transmit<P, Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
-    I: ReceiveInfo + Default + std::fmt::Debug,
+    T: Receive<P, Error=E> + Transmit<P, Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
+    P: Param,
+    P::Info: Default,
     E: std::fmt::Debug,
 {
     let mut link_info = LinkTestInfo{
@@ -394,7 +397,7 @@ where
         remote_rssi: Stats::new(),
     };
 
-    let mut info = I::default();
+    let mut info = P::Info::default();
     let mut buff = [0u8; 32];
 
      // Set output power if specified

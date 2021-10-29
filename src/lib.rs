@@ -33,7 +33,7 @@ pub mod helpers;
 pub mod mock;
 
 /// Radio trait combines Base, Configure, Send and Receive for a generic radio object
-pub trait Radio<P>: Transmit<P> + Receive<P> + State {}
+pub trait Radio<P: Param>: Transmit<P> + Receive<P> + State {}
 
 /// Transmit trait for radios that can transmit packets
 /// 
@@ -59,11 +59,9 @@ pub trait Transmit<P> {
 /// `start_receive` should be used to setup the radio in receive mode, with `check_receive` called
 /// periodically (or using interrupts) to poll for packet reception. Once a packet has been received,
 /// `get_received` fetches the received packet (and associated info) from the radio.
-pub trait Receive<P> {
+pub trait Receive<P: Param> {
     /// Radio error
     type Error;
-    /// Packet received info
-    type Info;
 
     /// Set receiving on the specified channel
     /// 
@@ -82,7 +80,7 @@ pub trait Receive<P> {
     /// 
     /// This copies received data into the provided buffer and returns the number of bytes received
     /// as well as information about the received packet
-    fn get_received(&mut self, info: &mut Self::Info, buff: &mut [u8]) -> Result<usize, Self::Error>;
+    fn get_received(&mut self, info: &mut P::Info, buff: &mut [u8]) -> Result<usize, Self::Error>;
 }
 
 /// ReceiveInfo trait for receive information objects
@@ -246,6 +244,7 @@ pub trait Registers<R: Copy> {
     }
 }
 
+use crate::params::Param;
 #[cfg(feature="structopt")]
 use crate::std::str::FromStr;
 
