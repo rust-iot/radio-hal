@@ -16,13 +16,14 @@ extern crate log;
 
 extern crate embedded_hal;
 
-
 #[cfg(feature="std")]
 extern crate std;
 
 pub mod config;
 
 pub mod blocking;
+
+pub mod params;
 
 #[cfg(feature="nonblocking")]
 pub mod nonblocking;
@@ -32,20 +33,20 @@ pub mod helpers;
 pub mod mock;
 
 /// Radio trait combines Base, Configure, Send and Receive for a generic radio object
-pub trait Radio: Transmit + Receive + State {}
+pub trait Radio<P: Param>: Transmit<P> + Receive<P> + State {}
 
 /// Transmit trait for radios that can transmit packets
 /// 
 /// `start_transmit` should be called to load data into the radio, with `check_transmit` called
 /// periodically (or using interrupts) to continue and finalise the transmission.
-pub trait Transmit {
+pub trait Transmit<P> {
     /// Radio error
     type Error;
 
     /// Start sending a packet on the provided channel
     /// 
     /// Returns an error if send was not started
-    fn start_transmit(&mut self, data: &[u8]) -> Result<(), Self::Error>;
+    fn start_transmit(&mut self, data: &[u8], params: &P) -> Result<(), Self::Error>;
 
     /// Check for send completion
     /// 
@@ -58,16 +59,14 @@ pub trait Transmit {
 /// `start_receive` should be used to setup the radio in receive mode, with `check_receive` called
 /// periodically (or using interrupts) to poll for packet reception. Once a packet has been received,
 /// `get_received` fetches the received packet (and associated info) from the radio.
-pub trait Receive {
+pub trait Receive<P: Param> {
     /// Radio error
     type Error;
-    /// Packet received info
-    type Info;
 
     /// Set receiving on the specified channel
     /// 
     /// Returns an error if receive mode was not entered
-    fn start_receive(&mut self) -> Result<(), Self::Error>;
+    fn start_receive(&mut self, params: &P) -> Result<(), Self::Error>;
 
     /// Check for reception
     /// 
@@ -81,7 +80,7 @@ pub trait Receive {
     /// 
     /// This copies received data into the provided buffer and returns the number of bytes received
     /// as well as information about the received packet
-    fn get_received(&mut self, info: &mut Self::Info, buff: &mut [u8]) -> Result<usize, Self::Error>;
+    fn get_received(&mut self, info: &mut P::Info, buff: &mut [u8]) -> Result<usize, Self::Error>;
 }
 
 /// ReceiveInfo trait for receive information objects
@@ -245,6 +244,7 @@ pub trait Registers<R: Copy> {
     }
 }
 
+use crate::params::Param;
 #[cfg(feature="structopt")]
 use crate::std::str::FromStr;
 

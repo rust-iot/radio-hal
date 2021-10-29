@@ -17,6 +17,7 @@ use structopt::StructOpt;
 use crate::std::string::ToString;
 
 use crate::{Transmit, Receive, State};
+use crate::params::Param;
 
 /// BlockingOptions for blocking radio functions
 #[derive(Clone, PartialEq, Debug)]
@@ -60,6 +61,7 @@ impl <E> From<E> for BlockingError<E> {
 # use radio::*;
 # use radio::mock::*;
 use radio::blocking::{BlockingTransmit, BlockingOptions};
+use radio::params::Basic;
 
 # let mut radio = MockRadio::new(&[
 #    Transaction::start_transmit(vec![0xaa, 0xbb], None),
@@ -69,7 +71,7 @@ use radio::blocking::{BlockingTransmit, BlockingOptions};
 # ]);
 # 
 // Transmit using a blocking call
-let res = radio.do_transmit(&[0xaa, 0xbb], BlockingOptions::default());
+let res = radio.do_transmit(&[0xaa, 0xbb], &Basic, BlockingOptions::default());
 
 assert_eq!(res, Ok(()));
 
@@ -77,18 +79,18 @@ assert_eq!(res, Ok(()));
 ```
 "##)]
 ///
-pub trait BlockingTransmit<E> {
-    fn do_transmit(&mut self, data: &[u8], tx_options: BlockingOptions) -> Result<(), BlockingError<E>>;
+pub trait BlockingTransmit<P, E> {
+    fn do_transmit(&mut self, data: &[u8], params: &P, tx_options: BlockingOptions) -> Result<(), BlockingError<E>>;
 }
 
-impl <T, E> BlockingTransmit<E> for T
+impl <T, P, E> BlockingTransmit<P, E> for T
 where 
-    T: Transmit<Error = E> + DelayUs<u32>,
+    T: Transmit<P, Error = E> + DelayUs<u32>,
     E: core::fmt::Debug,
 {
-    fn do_transmit(&mut self, data: &[u8], tx_options: BlockingOptions) -> Result<(), BlockingError<E>> {
+    fn do_transmit(&mut self, data: &[u8], params: &P, tx_options: BlockingOptions) -> Result<(), BlockingError<E>> {
         // Enter transmit mode
-        self.start_transmit(data)?;
+        self.start_transmit(data, params)?;
 
         let t = tx_options.timeout.as_micros();
         let mut c = 0;
@@ -121,6 +123,7 @@ where
 # use radio::*;
 # use radio::mock::*;
 use radio::blocking::{BlockingReceive, BlockingOptions};
+use radio::params::Basic;
 
 let data = [0xaa, 0xbb];
 let info = BasicInfo::new(-81, 0);
@@ -136,10 +139,11 @@ let info = BasicInfo::new(-81, 0);
 # 
 
 let mut buff = [0u8; 128];
+let params = Basic;
 let mut i = BasicInfo::new(0, 0);
 
 // Receive using a blocking call
-let res = radio.do_receive(&mut buff, &mut i, BlockingOptions::default());
+let res = radio.do_receive(&mut buff, &params, &mut i, BlockingOptions::default());
 
 assert_eq!(res, Ok(data.len()));
 assert_eq!(&buff[..data.len()], &data);
@@ -148,19 +152,19 @@ assert_eq!(&buff[..data.len()], &data);
 ```
 "##)]
 /// 
-pub trait BlockingReceive<I, E> {
-    fn do_receive(&mut self, buff: &mut [u8], info: &mut I, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>>;
+pub trait BlockingReceive<P: Param, E> {
+    fn do_receive(&mut self, buff: &mut [u8], params: &P, info: &mut P::Info, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>>;
 }
 
-impl <T, I, E> BlockingReceive<I, E> for T 
+impl <T, P, E> BlockingReceive<P, E> for T
 where
-    T: Receive<Info=I, Error=E> + DelayUs<u32>,
-    I: core::fmt::Debug,
+    T: Receive<P, Error=E> + DelayUs<u32>,
+    P: Param,
     E: core::fmt::Debug,
 {
-    fn do_receive(&mut self, buff: &mut [u8], info: &mut I, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>> {
+    fn do_receive(&mut self, buff: &mut [u8], params: &P, info: &mut P::Info, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>> {
         // Start receive mode
-        self.start_receive()?;
+        self.start_receive(params)?;
 
         let t = rx_options.timeout.as_micros();
         let mut c = 0;

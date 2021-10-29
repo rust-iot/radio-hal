@@ -7,16 +7,18 @@
 //! ## Copyright 2020 Ryan Kurte
 
 extern crate std;
+
 use std::vec::Vec;
 use std::fmt::Debug;
 use std::convert::Infallible;
 
-use embedded_hal::blocking::delay::DelayUs;
+use embedded_hal::delay::blocking::DelayUs;
 
 extern crate embedded_hal_mock;
 use embedded_hal_mock::common::Generic;
 
 use crate::{State, Busy, Transmit, Receive, Power, Channel, Rssi, Interrupts, BasicInfo};
+use crate::params::Basic;
 
 /// Generic mock radio
 /// 
@@ -63,7 +65,6 @@ where
 
 /// Concrete mock radio using mock types
 pub type MockRadio = Radio<MockState, u8, u8, BasicInfo, u8, MockError>;
-
 
 /// MockState for use with mock radio
 #[derive(Debug, Clone, PartialEq)]
@@ -277,7 +278,7 @@ where
 {
     type Error = Infallible;
 
-    fn try_delay_us(&mut self, ms: u32) -> Result<(), Self::Error> {
+    fn delay_us(&mut self, ms: u32) -> Result<(), Self::Error> {
         let n = self.next().expect("no expectation for delay_us call");
 
         assert_eq!(&n.request, &Request::DelayUs(ms));
@@ -471,7 +472,7 @@ where
     }
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> Transmit for Radio<St, Reg, Ch, Inf, Irq, E> 
+impl <St, Reg, Ch, Inf, Irq, E> Transmit<Basic> for Radio<St, Reg, Ch, Inf, Irq, E>
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
@@ -482,7 +483,7 @@ where
 {
     type Error = E;
 
-    fn start_transmit(&mut self, data: &[u8]) -> Result<(), Self::Error> {
+    fn start_transmit(&mut self, data: &[u8], _: &Basic) -> Result<(), Self::Error> {
         let n = self.next().expect("no expectation for Transmit::start_transmit call");
 
         assert_eq!(&n.request, &Request::StartTransmit(data.to_vec()));
@@ -515,7 +516,7 @@ where
     }
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> Receive for Radio<St, Reg, Ch, Inf, Irq, E> 
+impl <St, Reg, Ch, Inf, Irq, E> Receive<Basic> for Radio<St, Reg, Ch, Inf, Irq, E>
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
@@ -524,10 +525,10 @@ where
     Irq: PartialEq + Debug + Clone,
     E: PartialEq + Debug + Clone,
 {
-    type Info = Inf;
     type Error = E;
+    type Info = Inf;
 
-    fn start_receive(&mut self) -> Result<(), Self::Error> {
+    fn start_receive(&mut self, _: &Basic) -> Result<(), Self::Error> {
         let n = self.next().expect("no expectation for Receive::start_receive call");
 
         assert_eq!(&n.request, &Request::StartReceive);
@@ -566,7 +567,7 @@ where
 
         let res = match &n.response {
             Response::Received(d, i) => {
-                &mut buff[..d.len()].copy_from_slice(&d);
+                buff[..d.len()].copy_from_slice(&d);
                 *info = i.clone();
 
                 Ok(d.len())
@@ -638,7 +639,7 @@ mod test {
     fn test_radio_mock_start_transmit() {
         let mut radio = MockRadio::new(&[Transaction::start_transmit(vec![0xaa, 0xbb, 0xcc], None)]);
 
-        let _res = radio.start_transmit(&[0xaa, 0xbb, 0xcc]).unwrap();
+        let _res = radio.start_transmit(&[0xaa, 0xbb, 0xcc], &Basic).unwrap();
 
         radio.done();
     }
@@ -660,7 +661,7 @@ mod test {
     fn test_radio_mock_start_receive() {
         let mut radio = MockRadio::new(&[Transaction::start_receive(None)]);
 
-        let _res = radio.start_receive().unwrap();
+        let _res = radio.start_receive(&Basic).unwrap();
 
         radio.done();
     }
