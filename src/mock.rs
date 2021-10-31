@@ -1,39 +1,42 @@
 //! Mock radio driver for application testing
-//! 
+//!
 //! This provides a generic and specific mock implementation of the radio traits
 //! to support network and application level testing.
-//! 
+//!
 //! ## https://github.com/ryankurte/rust-radio
 //! ## Copyright 2020 Ryan Kurte
 
 extern crate std;
-use std::vec::Vec;
-use std::fmt::Debug;
 use std::convert::Infallible;
+use std::fmt::Debug;
+use std::vec::Vec;
 
-use embedded_hal::blocking::delay::DelayUs;
+use embedded_hal::delay::blocking::DelayUs;
 
 extern crate embedded_hal_mock;
 use embedded_hal_mock::common::Generic;
 
-use crate::{State, Busy, Transmit, Receive, Power, Channel, Rssi, Interrupts, BasicInfo};
+use crate::{
+    BasicInfo, Busy, Channel, Interrupts, Power, RadioState, Receive, ReceiveInfo, Rssi, State,
+    Transmit,
+};
 
 /// Generic mock radio
-/// 
+///
 /// Based on `embedded_hal_mock::common::Generic`
 #[derive(Debug, Clone)]
 pub struct Radio<
-    St: Debug + Clone + PartialEq, 
-    Reg: Debug + Clone + PartialEq, 
-    Ch: Debug + Clone + PartialEq, 
-    Inf: Debug + Clone + PartialEq, 
-    Irq: Debug + Clone + PartialEq, 
-    E: Debug + Clone + PartialEq
+    St: Debug + Clone + PartialEq,
+    Reg: Debug + Clone + PartialEq,
+    Ch: Debug + Clone + PartialEq,
+    Inf: Debug + Clone + PartialEq,
+    Irq: Debug + Clone + PartialEq,
+    E: Debug + Clone + PartialEq,
 > {
-    inner: Generic<Transaction<St, Reg, Ch, Inf, Irq, E>>
+    inner: Generic<Transaction<St, Reg, Ch, Inf, Irq, E>>,
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> Radio<St, Reg, Ch, Inf, Irq, E> 
+impl<St, Reg, Ch, Inf, Irq, E> Radio<St, Reg, Ch, Inf, Irq, E>
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
@@ -44,8 +47,8 @@ where
 {
     pub fn new(expectations: &[Transaction<St, Reg, Ch, Inf, Irq, E>]) -> Self {
         let inner = Generic::new(expectations);
-        
-        Self{inner}
+
+        Self { inner }
     }
 
     pub fn expect(&mut self, expectations: &[Transaction<St, Reg, Ch, Inf, Irq, E>]) {
@@ -63,7 +66,6 @@ where
 
 /// Concrete mock radio using mock types
 pub type MockRadio = Radio<MockState, u8, u8, BasicInfo, u8, MockError>;
-
 
 /// MockState for use with mock radio
 #[derive(Debug, Clone, PartialEq)]
@@ -87,7 +89,9 @@ impl crate::RadioState for MockState {
 
 /// MockError for use with mock radio
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "thiserror", derive(thiserror::Error))]
 pub enum MockError {
+    #[cfg_attr(feature = "thiserror", error("Timeout"))]
     Timeout,
 }
 
@@ -98,10 +102,10 @@ pub struct Transaction<St, Reg, Ch, Inf, Irq, E> {
     response: Response<St, Inf, Irq, E>,
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
+impl<St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
     /// Set the radio state
     pub fn set_state(state: St, err: Option<E>) -> Self {
-        Self{
+        Self {
             request: Request::SetState(state),
             response: err.into(),
         }
@@ -125,7 +129,7 @@ impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
 
     /// Set a radio register
     pub fn set_register(reg: Reg, value: u8, err: Option<E>) -> Self {
-        Self{
+        Self {
             request: Request::SetRegister(reg, value),
             response: err.into(),
         }
@@ -141,7 +145,7 @@ impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
 
     /// Set a radio channel
     pub fn set_channel(ch: Ch, err: Option<E>) -> Self {
-        Self{
+        Self {
             request: Request::SetChannel(ch),
             response: err.into(),
         }
@@ -149,7 +153,7 @@ impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
 
     /// Set radio power
     pub fn set_power(power: i8, err: Option<E>) -> Self {
-        Self{
+        Self {
             request: Request::SetPower(power),
             response: err.into(),
         }
@@ -157,7 +161,7 @@ impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
 
     /// Start radio transmission
     pub fn start_transmit(data: Vec<u8>, err: Option<E>) -> Self {
-        Self{
+        Self {
             request: Request::StartTransmit(data),
             response: err.into(),
         }
@@ -165,7 +169,7 @@ impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
 
     /// Check for transmission completed
     pub fn check_transmit(res: Result<bool, E>) -> Self {
-        Self{
+        Self {
             request: Request::CheckTransmit,
             response: res.map_or_else(Response::Err, Response::Bool),
         }
@@ -173,7 +177,7 @@ impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
 
     /// Start radio reception
     pub fn start_receive(err: Option<E>) -> Self {
-        Self{
+        Self {
             request: Request::StartReceive,
             response: err.into(),
         }
@@ -189,7 +193,7 @@ impl <St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
 
     /// Fetch received data and information
     pub fn get_received(res: Result<(Vec<u8>, Inf), E>) -> Self {
-        Self{
+        Self {
             request: Request::GetReceived,
             response: res.map_or_else(Response::Err, |(d, i)| Response::Received(d, i)),
         }
@@ -234,7 +238,7 @@ enum Request<St, Reg, Ch> {
 
     SetChannel(Ch),
     SetPower(i8),
-    
+
     StartTransmit(Vec<u8>),
     CheckTransmit,
 
@@ -257,7 +261,7 @@ enum Response<St, Inf, Irq, E> {
     Err(E),
 }
 
-impl <St, Inf, Irq, E> From<Option<E>> for Response<St, Inf, Irq, E> {
+impl<St, Inf, Irq, E> From<Option<E>> for Response<St, Inf, Irq, E> {
     fn from(e: Option<E>) -> Self {
         match e {
             Some(v) => Response::Err(v),
@@ -266,7 +270,7 @@ impl <St, Inf, Irq, E> From<Option<E>> for Response<St, Inf, Irq, E> {
     }
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> DelayUs<u32> for Radio<St, Reg, Ch, Inf, Irq, E> 
+impl<St, Reg, Ch, Inf, Irq, E> DelayUs<u32> for Radio<St, Reg, Ch, Inf, Irq, E>
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
@@ -277,7 +281,7 @@ where
 {
     type Error = Infallible;
 
-    fn try_delay_us(&mut self, ms: u32) -> Result<(), Self::Error> {
+    fn delay_us(&mut self, ms: u32) -> Result<(), Self::Error> {
         let n = self.next().expect("no expectation for delay_us call");
 
         assert_eq!(&n.request, &Request::DelayUs(ms));
@@ -286,9 +290,9 @@ where
     }
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> State for Radio<St, Reg, Ch, Inf, Irq, E> 
+impl<St, Reg, Ch, Inf, Irq, E> State for Radio<St, Reg, Ch, Inf, Irq, E>
 where
-    St: PartialEq + Debug + Clone,
+    St: RadioState + PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
     Ch: PartialEq + Debug + Clone,
     Inf: PartialEq + Debug + Clone,
@@ -299,7 +303,9 @@ where
     type Error = E;
 
     fn set_state(&mut self, state: Self::State) -> Result<(), Self::Error> {
-        let n = self.next().expect("no expectation for State::set_state call");
+        let n = self
+            .next()
+            .expect("no expectation for State::set_state call");
 
         assert_eq!(&n.request, &Request::SetState(state.clone()));
 
@@ -315,8 +321,9 @@ where
     }
 
     fn get_state(&mut self) -> Result<Self::State, Self::Error> {
-        
-        let n = self.next().expect("no expectation for State::get_state call");
+        let n = self
+            .next()
+            .expect("no expectation for State::get_state call");
 
         assert_eq!(&n.request, &Request::GetState);
 
@@ -330,10 +337,9 @@ where
 
         res
     }
-
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> Busy for Radio<St, Reg, Ch, Inf, Irq, E> 
+impl<St, Reg, Ch, Inf, Irq, E> Busy for Radio<St, Reg, Ch, Inf, Irq, E>
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
@@ -361,7 +367,7 @@ where
     }
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> Channel for Radio<St, Reg, Ch, Inf, Irq, E> 
+impl<St, Reg, Ch, Inf, Irq, E> Channel for Radio<St, Reg, Ch, Inf, Irq, E>
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
@@ -376,7 +382,9 @@ where
     fn set_channel(&mut self, channel: &Self::Channel) -> Result<(), Self::Error> {
         debug!("Set channel {:?}", channel);
 
-        let n = self.next().expect("no expectation for State::set_channel call");
+        let n = self
+            .next()
+            .expect("no expectation for State::set_channel call");
 
         assert_eq!(&n.request, &Request::SetChannel(channel.clone()));
 
@@ -388,7 +396,7 @@ where
     }
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> Power for Radio<St, Reg, Ch, Inf, Irq, E> 
+impl<St, Reg, Ch, Inf, Irq, E> Power for Radio<St, Reg, Ch, Inf, Irq, E>
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
@@ -402,7 +410,9 @@ where
     fn set_power(&mut self, power: i8) -> Result<(), Self::Error> {
         debug!("Set power {:?}", power);
 
-        let n = self.next().expect("no expectation for Power::set_power call");
+        let n = self
+            .next()
+            .expect("no expectation for Power::set_power call");
 
         assert_eq!(&n.request, &Request::SetPower(power));
 
@@ -414,7 +424,7 @@ where
     }
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> Rssi for Radio<St, Reg, Ch, Inf, Irq, E> 
+impl<St, Reg, Ch, Inf, Irq, E> Rssi for Radio<St, Reg, Ch, Inf, Irq, E>
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
@@ -426,7 +436,9 @@ where
     type Error = E;
 
     fn poll_rssi(&mut self) -> Result<i16, Self::Error> {
-        let n = self.next().expect("no expectation for Rssi::poll_rssi call");
+        let n = self
+            .next()
+            .expect("no expectation for Rssi::poll_rssi call");
 
         assert_eq!(&n.request, &Request::PollRssi);
 
@@ -442,7 +454,7 @@ where
     }
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> Interrupts for Radio<St, Reg, Ch, Inf, Irq, E> 
+impl<St, Reg, Ch, Inf, Irq, E> Interrupts for Radio<St, Reg, Ch, Inf, Irq, E>
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
@@ -455,7 +467,9 @@ where
     type Irq = Irq;
 
     fn get_interrupts(&mut self, clear: bool) -> Result<Self::Irq, Self::Error> {
-        let n = self.next().expect("no expectation for Transmit::check_transmit call");
+        let n = self
+            .next()
+            .expect("no expectation for Transmit::check_transmit call");
 
         assert_eq!(&n.request, &Request::GetIrq(clear));
 
@@ -471,7 +485,7 @@ where
     }
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> Transmit for Radio<St, Reg, Ch, Inf, Irq, E> 
+impl<St, Reg, Ch, Inf, Irq, E> Transmit for Radio<St, Reg, Ch, Inf, Irq, E>
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
@@ -483,7 +497,9 @@ where
     type Error = E;
 
     fn start_transmit(&mut self, data: &[u8]) -> Result<(), Self::Error> {
-        let n = self.next().expect("no expectation for Transmit::start_transmit call");
+        let n = self
+            .next()
+            .expect("no expectation for Transmit::start_transmit call");
 
         assert_eq!(&n.request, &Request::StartTransmit(data.to_vec()));
 
@@ -499,7 +515,9 @@ where
     }
 
     fn check_transmit(&mut self) -> Result<bool, Self::Error> {
-        let n = self.next().expect("no expectation for Transmit::check_transmit call");
+        let n = self
+            .next()
+            .expect("no expectation for Transmit::check_transmit call");
 
         assert_eq!(&n.request, &Request::CheckTransmit);
 
@@ -515,12 +533,12 @@ where
     }
 }
 
-impl <St, Reg, Ch, Inf, Irq, E> Receive for Radio<St, Reg, Ch, Inf, Irq, E> 
+impl<St, Reg, Ch, Inf, Irq, E> Receive for Radio<St, Reg, Ch, Inf, Irq, E>
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
     Ch: PartialEq + Debug + Clone,
-    Inf: PartialEq + Debug + Clone,
+    Inf: ReceiveInfo + PartialEq + Debug + Clone,
     Irq: PartialEq + Debug + Clone,
     E: PartialEq + Debug + Clone,
 {
@@ -528,7 +546,9 @@ where
     type Error = E;
 
     fn start_receive(&mut self) -> Result<(), Self::Error> {
-        let n = self.next().expect("no expectation for Receive::start_receive call");
+        let n = self
+            .next()
+            .expect("no expectation for Receive::start_receive call");
 
         assert_eq!(&n.request, &Request::StartReceive);
 
@@ -544,7 +564,9 @@ where
     }
 
     fn check_receive(&mut self, restart: bool) -> Result<bool, Self::Error> {
-        let n = self.next().expect("no expectation for Receive::check_receive call");
+        let n = self
+            .next()
+            .expect("no expectation for Receive::check_receive call");
 
         assert_eq!(&n.request, &Request::CheckReceive(restart));
 
@@ -559,18 +581,19 @@ where
         res
     }
 
-    fn get_received(&mut self, info: &mut Self::Info, buff: &mut [u8]) -> Result<usize, Self::Error> {
-        let n = self.next().expect("no expectation for Receive::get_received call");
+    fn get_received(&mut self, buff: &mut [u8]) -> Result<(usize, Self::Info), Self::Error> {
+        let n = self
+            .next()
+            .expect("no expectation for Receive::get_received call");
 
         assert_eq!(&n.request, &Request::GetReceived);
 
         let res = match &n.response {
             Response::Received(d, i) => {
-                &mut buff[..d.len()].copy_from_slice(&d);
-                *info = i.clone();
+                buff[..d.len()].copy_from_slice(&d);
 
-                Ok(d.len())
-            },
+                Ok((d.len(), i.clone()))
+            }
             Response::Err(e) => Err(e.clone()),
             _ => unreachable!(),
         };
@@ -636,7 +659,8 @@ mod test {
 
     #[test]
     fn test_radio_mock_start_transmit() {
-        let mut radio = MockRadio::new(&[Transaction::start_transmit(vec![0xaa, 0xbb, 0xcc], None)]);
+        let mut radio =
+            MockRadio::new(&[Transaction::start_transmit(vec![0xaa, 0xbb, 0xcc], None)]);
 
         let _res = radio.start_transmit(&[0xaa, 0xbb, 0xcc]).unwrap();
 
@@ -645,7 +669,10 @@ mod test {
 
     #[test]
     fn test_radio_mock_check_transmit() {
-        let mut radio = MockRadio::new(&[Transaction::check_transmit(Ok(false)), Transaction::check_transmit(Ok(true))]);
+        let mut radio = MockRadio::new(&[
+            Transaction::check_transmit(Ok(false)),
+            Transaction::check_transmit(Ok(true)),
+        ]);
 
         let res = radio.check_transmit().unwrap();
         assert_eq!(false, res);
@@ -667,12 +694,15 @@ mod test {
 
     #[test]
     fn test_radio_mock_check_receive() {
-        let mut radio = MockRadio::new(&[Transaction::check_receive(true, Ok(false)), Transaction::check_receive(true, Ok(true))]);
+        let mut radio = MockRadio::new(&[
+            Transaction::check_receive(true, Ok(false)),
+            Transaction::check_receive(true, Ok(true)),
+        ]);
 
-        let res = radio.check_receive(true, ).unwrap();
+        let res = radio.check_receive(true).unwrap();
         assert_eq!(false, res);
 
-        let res = radio.check_receive(true, ).unwrap();
+        let res = radio.check_receive(true).unwrap();
         assert_eq!(true, res);
 
         radio.done();
@@ -680,16 +710,17 @@ mod test {
 
     #[test]
     fn test_radio_mock_get_received() {
-        let mut radio = MockRadio::new(&[Transaction::get_received(Ok((vec![0xaa, 0xbb], BasicInfo::new(10, 12))))]);
+        let mut radio = MockRadio::new(&[Transaction::get_received(Ok((
+            vec![0xaa, 0xbb],
+            BasicInfo::new(10, 12),
+        )))]);
 
         let mut buff = vec![0u8; 3];
-        let mut info = BasicInfo::new(0, 0);
 
-        let res = radio.get_received(&mut info, &mut buff).unwrap();
+        let (n, _i) = radio.get_received(&mut buff).unwrap();
 
-        assert_eq!(2, res);
+        assert_eq!(2, n);
         assert_eq!(&buff[..2], &[0xaa, 0xbb]);
-
 
         radio.done();
     }
