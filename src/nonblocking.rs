@@ -4,26 +4,27 @@
 //! ## https://github.com/ryankurte/rust-radio
 //! ## Copyright 2020 Ryan Kurte
 
-use core::time::Duration;
+use core::fmt::Debug;
 use core::future::Future;
 use core::marker::PhantomData;
-use core::task::{Context, Poll};
 use core::pin::Pin;
+use core::task::{Context, Poll};
+use core::time::Duration;
 
-use crate::{Transmit, Receive, Power};
+use crate::{Power, Receive, ReceiveInfo, Transmit};
 
 /// Options for async driver calls
 pub struct AsyncOptions {
     /// Power option, for transmit operations
     pub power: Option<i8>,
-    
+
     /// Timeout option for underlying radio operations
     #[deprecated(note = "Timeouts must (currently) be implemented outside this module")]
     pub timeout: Option<Duration>,
-    
+
     /// Period for polling on operation status with custom wakers
     pub poll_period: Duration,
-    
+
     /// Waker function to be called in the `Poll` method
     pub wake_fn: Option<&'static fn(cx: &mut Context, d: Duration)>,
 }
@@ -31,7 +32,7 @@ pub struct AsyncOptions {
 impl Default for AsyncOptions {
     #[allow(deprecated)]
     fn default() -> Self {
-        Self {            
+        Self {
             power: None,
             timeout: None,
             poll_period: Duration::from_millis(10),
@@ -42,20 +43,25 @@ impl Default for AsyncOptions {
 
 /// AsyncError wraps radio errors and provides notification of timeouts
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "thiserror", derive(thiserror::Error))]
 pub enum AsyncError<E> {
+    #[cfg_attr(feature = "thiserror", error("Inner: {0}"))]
     Inner(E),
+    #[cfg_attr(feature = "thiserror", error("Timeout"))]
     Timeout,
 }
 
-impl <E> From<E> for AsyncError<E> {
+impl<E> From<E> for AsyncError<E> {
     fn from(e: E) -> Self {
         AsyncError::Inner(e)
     }
 }
 
 /// Async transmit function implemented over `radio::Transmit` and `radio::Power` using the provided `AsyncOptions`
-/// 
-#[cfg_attr(feature = "mock", doc = r##"
+///
+#[cfg_attr(
+    feature = "mock",
+    doc = r##"
 ```
 extern crate async_std;
 use async_std::task;
@@ -79,15 +85,19 @@ assert_eq!(res, Ok(()));
 
 # radio.done();
 ```
-"##)]
+"##
+)]
 
-/// AsyncTransmit function provides an async implementation for transmitting packets 
+/// AsyncTransmit function provides an async implementation for transmitting packets
 pub trait AsyncTransmit<'a, E> {
-    type Output: Future<Output=Result<(), AsyncError<E>>>;
+    type Output: Future<Output = Result<(), AsyncError<E>>>;
 
-    fn async_transmit(&'a mut self, data: &'a [u8], tx_options: AsyncOptions) -> Result<Self::Output, E>;
+    fn async_transmit(
+        &'a mut self,
+        data: &'a [u8],
+        tx_options: AsyncOptions,
+    ) -> Result<Self::Output, E>;
 }
-
 
 /// Future object containing a radio for transmit operation
 pub struct TransmitFuture<'a, T, E> {
@@ -97,15 +107,18 @@ pub struct TransmitFuture<'a, T, E> {
 }
 
 /// `AsyncTransmit` object for all `Transmit` devices
-impl <'a, T, E> AsyncTransmit<'a, E> for T
+impl<'a, T, E> AsyncTransmit<'a, E> for T
 where
     T: Transmit<Error = E> + Power<Error = E> + 'a,
-    E: core::fmt::Debug + Unpin,
+    E: Debug + Unpin,
 {
     type Output = TransmitFuture<'a, T, E>;
 
-    fn async_transmit(&'a mut self, data: &'a [u8], tx_options: AsyncOptions) -> Result<Self::Output, E>
-    {
+    fn async_transmit(
+        &'a mut self,
+        data: &'a [u8],
+        tx_options: AsyncOptions,
+    ) -> Result<Self::Output, E> {
         // Set output power if specified
         if let Some(p) = tx_options.power {
             self.set_power(p)?;
@@ -115,21 +128,20 @@ where
         self.start_transmit(data)?;
 
         // Create transmit future
-        let f: TransmitFuture<_, E> = TransmitFuture{
-            radio: self, 
+        let f: TransmitFuture<_, E> = TransmitFuture {
+            radio: self,
             options: tx_options,
-            _err: PhantomData
+            _err: PhantomData,
         };
 
         Ok(f)
     }
 }
 
-
-impl <'a, T, E> Future for TransmitFuture<'a, T, E> 
-where 
+impl<'a, T, E> Future for TransmitFuture<'a, T, E>
+where
     T: Transmit<Error = E> + Power<Error = E>,
-    E: core::fmt::Debug + Unpin,
+    E: Debug + Unpin,
 {
     type Output = Result<(), AsyncError<E>>;
 
@@ -139,9 +151,9 @@ where
 
         // Check for completion
         if s.radio.check_transmit()? {
-            return Poll::Ready(Ok(()))
+            return Poll::Ready(Ok(()));
         };
-        
+
         // Spawn task to re-execute waker
         if let Some(w) = s.options.wake_fn {
             w(cx, period);
@@ -154,10 +166,11 @@ where
     }
 }
 
-
 /// Async transmit function implemented over `radio::Transmit` and `radio::Power` using the provided `AsyncOptions`
-/// 
-#[cfg_attr(feature = "mock", doc = r##"
+///
+#[cfg_attr(
+    feature = "mock",
+    doc = r##"
 ```
 extern crate async_std;
 use async_std::task;
@@ -181,68 +194,78 @@ let info = BasicInfo::new(-81, 0);
 let mut buff = [0u8; 128];
 let mut i = BasicInfo::new(0, 0);
 
-let res = task::block_on(async {
+let (n, i) = task::block_on(async {
     // Receive using a future
-    radio.async_receive(&mut i, &mut buff, AsyncOptions::default())?.await
-});
+    radio.async_receive(&mut buff, AsyncOptions::default())?.await
+})?;
 
-assert_eq!(res, Ok(data.len()));
+assert_eq!(n, data.len());
 assert_eq!(&buff[..data.len()], &data);
 
 # radio.done();
+
+Ok::<(), anyhow::Error>(())
 ```
-"##)]
+"##
+)]
 
 /// AsyncReceive trait support futures-based polling on receive
 pub trait AsyncReceive<'a, I, E> {
-    type Output: Future<Output=Result<usize, AsyncError<E>>>;
+    type Output: Future<Output = Result<(usize, I), AsyncError<E>>>;
 
-    fn async_receive(&'a mut self, info: &'a mut I, buff: &'a mut [u8], rx_options: AsyncOptions) -> Result<Self::Output, E>;
+    fn async_receive(
+        &'a mut self,
+        buff: &'a mut [u8],
+        rx_options: AsyncOptions,
+    ) -> Result<Self::Output, E>;
 }
 
 /// Receive future wraps a radio and buffer to provide a pollable future for receiving packets
 pub struct ReceiveFuture<'a, T, I, E> {
     radio: &'a mut T,
-    info: &'a mut I,
     buff: &'a mut [u8],
     options: AsyncOptions,
+    _inf: PhantomData<I>,
     _err: PhantomData<E>,
 }
 
-
 /// Generic implementation of `AsyncReceive` for all `Receive` capable radio devices
-impl <'a, T, I, E> AsyncReceive<'a, I, E> for T
+impl<'a, T, I, E> AsyncReceive<'a, I, E> for T
 where
     T: Receive<Error = E, Info = I> + 'a,
-    I: core::fmt::Debug + 'a,
-    E: core::fmt::Debug + Unpin,
+    I: ReceiveInfo + Unpin + 'a,
+    E: Debug + Unpin,
 {
     type Output = ReceiveFuture<'a, T, I, E>;
 
-    fn async_receive(&'a mut self, info: &'a mut I, buff: &'a mut [u8], rx_options: AsyncOptions) -> Result<Self::Output, E> {
+    fn async_receive(
+        &'a mut self,
+        buff: &'a mut [u8],
+        rx_options: AsyncOptions,
+    ) -> Result<Self::Output, E> {
         // Start receive mode
         self.start_receive()?;
 
         // Create receive future
         let f: ReceiveFuture<_, I, E> = ReceiveFuture {
-            radio: self, 
-            info, 
-            buff, 
+            radio: self,
+            buff,
             options: rx_options,
-            _err: PhantomData
+            _inf: PhantomData,
+            _err: PhantomData,
         };
 
         Ok(f)
     }
 }
 
-impl <'a, T, I, E> Future for ReceiveFuture<'a, T, I, E> 
-where 
+impl<'a, T, I, E> Future for ReceiveFuture<'a, T, I, E>
+where
     T: Receive<Error = E, Info = I>,
-    I: core::fmt::Debug,
-    E: core::fmt::Debug + Unpin,
+    I: ReceiveInfo + Unpin,
+    E: Debug + Unpin,
 {
-    type Output = Result<usize, AsyncError<E>>;
+    type Output = Result<(usize, I), AsyncError<E>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let s = self.get_mut();
@@ -250,9 +273,9 @@ where
         // Check for completion
         if s.radio.check_receive(true)? {
             // Retrieve data
-            let n = s.radio.get_received(s.info, s.buff)?;
+            let (n, i) = s.radio.get_received(s.buff)?;
 
-            return Poll::Ready(Ok(n));
+            return Poll::Ready(Ok((n, i)));
         }
 
         // TODO: should timeouts be internal or external?
@@ -271,7 +294,7 @@ where
 
 /// Task waker using async_std task::spawn with a task::sleep.
 /// Note that this cannot be relied on for accurate timing
-#[cfg(feature="async-std")]
+#[cfg(feature = "async-std")]
 pub fn async_std_task_waker(cx: &mut Context, period: Duration) {
     let waker = cx.waker().clone();
     async_std::task::spawn(async move {

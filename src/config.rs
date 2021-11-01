@@ -24,7 +24,6 @@ pub enum ConfigOption {
     /// Transmit power (dBm)
     TXPower(i16),
 
-
     /// Await Clear Channel before TX (if supported)
     AwaitCCA(bool),
     /// CCA threshold in dBm (used if AwaitCCA is set)
@@ -45,7 +44,7 @@ pub enum ConfigError<E> {
     NotSupported,
 
     /// Other (device, non-configuration errors)
-    Other(E)
+    Other(E),
 }
 
 /// Configure trait implemented by configurable radios
@@ -62,4 +61,3 @@ pub trait Configure {
     /// Returns Ok(true) on successful get, Ok(false) for unsupported options, Err(Self::Error) for errors
     fn get_option(&mut self, o: &mut ConfigOption) -> Result<(), ConfigError<Self::Error>>;
 }
-
