@@ -149,7 +149,7 @@ assert_eq!(&buff[..data.len()], &data);
 "##)]
 /// 
 pub trait BlockingReceive<I, E> {
-    fn do_receive(&mut self, buff: &mut [u8], info: &mut I, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>>;
+    fn do_receive(&mut self, buff: &mut [u8], rx_options: BlockingOptions) -> Result<(usize, I), BlockingError<E>>;
 }
 
 impl <T, I, E> BlockingReceive<I, E> for T 
@@ -158,7 +158,7 @@ where
     I: core::fmt::Debug,
     E: core::fmt::Debug,
 {
-    fn do_receive(&mut self, buff: &mut [u8], info: &mut I, rx_options: BlockingOptions) -> Result<usize, BlockingError<E>> {
+    fn do_receive(&mut self, buff: &mut [u8], rx_options: BlockingOptions) -> Result<(usize, I), BlockingError<E>> {
         // Start receive mode
         self.start_receive()?;
 
@@ -166,8 +166,8 @@ where
         let mut c = 0;
         loop {
             if self.check_receive(true)? {
-                let n = self.get_received(info, buff)?;
-                return Ok(n)
+                let (n, info) = self.get_received(buff)?;
+                return Ok((n, info))
             }
 
             c += rx_options.poll_interval.as_micros();

@@ -62,7 +62,7 @@ pub trait Receive {
     /// Radio error
     type Error;
     /// Packet received info
-    type Info;
+    type Info: ReceiveInfo;
 
     /// Set receiving on the specified channel
     /// 
@@ -81,7 +81,7 @@ pub trait Receive {
     /// 
     /// This copies received data into the provided buffer and returns the number of bytes received
     /// as well as information about the received packet
-    fn get_received(&mut self, info: &mut Self::Info, buff: &mut [u8]) -> Result<usize, Self::Error>;
+    fn get_received(&mut self, buff: &mut [u8]) -> Result<(usize, Self::Info), Self::Error>;
 }
 
 /// ReceiveInfo trait for receive information objects

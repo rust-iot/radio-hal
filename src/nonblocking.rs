@@ -195,15 +195,14 @@ assert_eq!(&buff[..data.len()], &data);
 
 /// AsyncReceive trait support futures-based polling on receive
 pub trait AsyncReceive<'a, I, E> {
-    type Output: Future<Output=Result<usize, AsyncError<E>>>;
+    type Output: Future<Output=Result<(usize, I), AsyncError<E>>>;
 
-    fn async_receive(&'a mut self, info: &'a mut I, buff: &'a mut [u8], rx_options: AsyncOptions) -> Result<Self::Output, E>;
+    fn async_receive(&'a mut self, buff: &'a mut [u8], rx_options: AsyncOptions) -> Result<Self::Output, E>;
 }
 
 /// Receive future wraps a radio and buffer to provide a pollable future for receiving packets
-pub struct ReceiveFuture<'a, T, I, E> {
+pub struct ReceiveFuture<'a, T, E> {
     radio: &'a mut T,
-    info: &'a mut I,
     buff: &'a mut [u8],
     options: AsyncOptions,
     _err: PhantomData<E>,
@@ -214,35 +213,34 @@ pub struct ReceiveFuture<'a, T, I, E> {
 impl <'a, T, I, E> AsyncReceive<'a, I, E> for T
 where
     T: Receive<Error = E, Info = I> + 'a,
-    I: core::fmt::Debug + 'a,
+    I: core::fmt::Debug + Unpin + 'a,
     E: core::fmt::Debug + Unpin,
 {
-    type Output = ReceiveFuture<'a, T, I, E>;
+    type Output = ReceiveFuture<'a, T, E>;
 
-    fn async_receive(&'a mut self, info: &'a mut I, buff: &'a mut [u8], rx_options: AsyncOptions) -> Result<Self::Output, E> {
+    fn async_receive(&'a mut self, buff: &'a mut [u8], rx_options: AsyncOptions) -> Result<Self::Output, E> {
         // Start receive mode
         self.start_receive()?;
 
         // Create receive future
-        let f: ReceiveFuture<_, I, E> = ReceiveFuture {
-            radio: self, 
-            info, 
+        let f: ReceiveFuture<_, E> = ReceiveFuture {
+            radio: self,
             buff, 
             options: rx_options,
-            _err: PhantomData
+            _err: PhantomData,
         };
 
         Ok(f)
     }
 }
 
-impl <'a, T, I, E> Future for ReceiveFuture<'a, T, I, E> 
+impl <'a, T, I, E> Future for ReceiveFuture<'a, T, E>
 where 
     T: Receive<Error = E, Info = I>,
-    I: core::fmt::Debug,
+    I: core::fmt::Debug + Unpin,
     E: core::fmt::Debug + Unpin,
 {
-    type Output = Result<usize, AsyncError<E>>;
+    type Output = Result<(usize, I), AsyncError<E>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let s = self.get_mut();
@@ -250,9 +248,9 @@ where
         // Check for completion
         if s.radio.check_receive(true)? {
             // Retrieve data
-            let n = s.radio.get_received(s.info, s.buff)?;
+            let (n, info) = s.radio.get_received(s.buff)?;
 
-            return Poll::Ready(Ok(n));
+            return Poll::Ready(Ok((n, info)));
         }
 
         // TODO: should timeouts be internal or external?

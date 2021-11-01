@@ -51,17 +51,16 @@ pub enum Operation {
 pub fn do_operation<T, I, E>(radio: &mut T, operation: Operation) -> Result<(), BlockingError<E>> 
 where
     T: Transmit<Error=E> + Power<Error=E> + Receive<Info=I, Error=E>  + Rssi<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
-    I: ReceiveInfo + Default + std::fmt::Debug,
+    I: ReceiveInfo + std::fmt::Debug,
     E: std::fmt::Debug,
 {
     let mut buff = [0u8; 1024];
-    let mut info = I::default();
 
     // TODO: the rest
     match operation {
         Operation::Transmit(options) => do_transmit(radio, options)?,
-        Operation::Receive(options) => do_receive(radio, &mut buff, &mut info, options).map(|_| ())?,
-        Operation::Echo(options) => do_echo(radio, &mut buff, &mut info, options).map(|_| ())?,
+        Operation::Receive(options) => do_receive(radio, &mut buff, options).map(|_| ())?,
+        Operation::Echo(options) => do_echo(radio, &mut buff, options).map(|_| ())?,
         Operation::Rssi(options) => do_rssi(radio, options).map(|_| ())?,
         Operation::LinkTest(options) => do_ping_pong(radio, options).map(|_| ())?,
         //_ => warn!("unsuppored command: {:?}", opts.command),
@@ -201,7 +200,7 @@ impl PcapOptions {
 }
 
 /// Receive from the radio using the provided configuration
-pub fn do_receive<T, I, E>(radio: &mut T, mut buff: &mut [u8], mut info: &mut I, options: ReceiveOptions) -> Result<usize, E> 
+pub fn do_receive<T, I, E>(radio: &mut T, mut buff: &mut [u8], options: ReceiveOptions) -> Result<(usize, I), E>
 where
     T: Receive<Info=I, Error=E> + DelayUs<u32, Error=E>,
     I: std::fmt::Debug,
@@ -215,7 +214,7 @@ where
 
     loop {
         if radio.check_receive(true)? {
-            let n = radio.get_received(&mut info, &mut buff)?;
+            let (n, info) = radio.get_received(&mut buff)?;
 
             match std::str::from_utf8(&buff[0..n as usize]) {
                 Ok(s) => info!("Received: '{}' info: {:?}", s, info),
@@ -229,7 +228,7 @@ where
             }
             
             if !options.continuous { 
-                return Ok(n)
+                return Ok((n, info))
             }
 
             radio.start_receive()?;
@@ -302,7 +301,7 @@ pub struct EchoOptions {
 }
 
 
-pub fn do_echo<T, I, E>(radio: &mut T, mut buff: &mut [u8], mut info: &mut I, options: EchoOptions) -> Result<usize, BlockingError<E>> 
+pub fn do_echo<T, I, E>(radio: &mut T, mut buff: &mut [u8], options: EchoOptions) -> Result<(usize, I), BlockingError<E>>
 where
     T: Receive<Info=I, Error=E> + Transmit<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
     I: ReceiveInfo + std::fmt::Debug,
@@ -319,7 +318,7 @@ where
     loop {
         if radio.check_receive(true)? {
             // Fetch received packet
-            let mut n = radio.get_received(&mut info, &mut buff)?;
+            let (mut n, info) = radio.get_received(&mut buff)?;
 
             // Parse out string if possible, otherwise print hex
             match std::str::from_utf8(&buff[0..n as usize]) {
@@ -340,7 +339,7 @@ where
             radio.do_transmit(&buff[..n], options.blocking_options.clone())?;
             
             // Exit if non-continuous
-            if !options.continuous { return Ok(n) }
+            if !options.continuous { return Ok((n, info)) }
         }
 
         // Wait for poll delay
@@ -384,7 +383,7 @@ pub struct LinkTestInfo {
 pub fn do_ping_pong<T, I, E>(radio: &mut T, options: PingPongOptions) -> Result<LinkTestInfo, BlockingError<E>> 
 where
     T: Receive<Info=I, Error=E> + Transmit<Error=E> + Power<Error=E> + DelayUs<u32, Error=E>,
-    I: ReceiveInfo + Default + std::fmt::Debug,
+    I: ReceiveInfo + std::fmt::Debug,
     E: std::fmt::Debug,
 {
     let mut link_info = LinkTestInfo{
@@ -394,7 +393,6 @@ where
         remote_rssi: Stats::new(),
     };
 
-    let mut info = I::default();
     let mut buff = [0u8; 32];
 
      // Set output power if specified
@@ -413,7 +411,7 @@ where
         radio.do_transmit(&buff[0..n], options.blocking_options.clone())?;
 
         // Await response
-        let n = match radio.do_receive(&mut buff, &mut info, options.blocking_options.clone()) {
+        let (n, info) = match radio.do_receive(&mut buff, options.blocking_options.clone()) {
             Ok(n) => n,
             Err(BlockingError::Timeout) => {
                 debug!("Timeout awaiting response {}", i);
