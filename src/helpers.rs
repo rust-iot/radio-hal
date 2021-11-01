@@ -5,7 +5,7 @@
 
 use structopt::StructOpt;
 use humantime::{Duration as HumanDuration};
-use embedded_hal::blocking::delay::DelayUs;
+use embedded_hal::delay::blocking::DelayUs;
 
 extern crate std;
 use std::prelude::v1::*;
@@ -105,7 +105,7 @@ where
 
         // Delay for repeated transmission or exit
         match &options.period {
-            Some(p) => radio.try_delay_us(p.as_micros() as u32).unwrap(),
+            Some(p) => radio.delay_us(p.as_micros() as u32).unwrap(),
             None => break,
         }
     }
@@ -235,7 +235,7 @@ where
             radio.start_receive()?;
         }
 
-        radio.try_delay_us(options.blocking_options.poll_interval.as_micros() as u32).unwrap();
+        radio.delay_us(options.blocking_options.poll_interval.as_micros() as u32).unwrap();
     }
 }
 
@@ -268,7 +268,7 @@ where
 
         radio.check_receive(true)?;
 
-        radio.try_delay_us(options.period.as_micros() as u32).unwrap();
+        radio.delay_us(options.period.as_micros() as u32).unwrap();
 
         if !options.continuous {
             break
@@ -334,7 +334,7 @@ where
             }
 
             // Wait for turnaround delay
-            radio.try_delay_us(options.delay.as_micros() as u32).unwrap();
+            radio.delay_us(options.delay.as_micros() as u32).unwrap();
 
             // Transmit respobnse
             radio.do_transmit(&buff[..n], options.blocking_options.clone())?;
@@ -344,7 +344,7 @@ where
         }
 
         // Wait for poll delay
-        radio.try_delay_us(options.blocking_options.poll_interval.as_micros() as u32).unwrap();
+        radio.delay_us(options.blocking_options.poll_interval.as_micros() as u32).unwrap();
     }
 }
 
@@ -443,7 +443,7 @@ where
         }
 
         // Wait for send delay
-        radio.try_delay_us(options.delay.as_micros() as u32).unwrap();
+        radio.delay_us(options.delay.as_micros() as u32).unwrap();
     }
 
     Ok(link_info)
