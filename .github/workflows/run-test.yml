@@ -1,0 +1,66 @@
+name: tests
+on: [push, pull_request]
+
+jobs:
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout sources
+      uses: actions/checkout@v2
+    - name: Install Rust (stable)
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        components: clippy
+        override: true
+    - name: Clippy
+      uses: actions-rs/cargo@v1
+      with:
+        command: clippy
+  format:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout sources
+      uses: actions/checkout@v2
+    - name: Install Rust (stable)
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        components: rustfmt
+        override: true
+    - name: Check Format
+      uses: actions-rs/cargo@v1
+      with:
+        command: fmt
+        args: --all -- --check
+  build-armv6m:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout sources
+      uses: actions/checkout@v2
+    - name: Install Rust (stable)
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+        target: thumbv6m-none-eabi
+    - name: Build
+      run: |
+        set -ex
+        cargo build
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout sources
+      uses: actions/checkout@v2
+    - name: Install Rust (stable)
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+    - name: Test
+      run: |
+        set -ex
+        cargo test
