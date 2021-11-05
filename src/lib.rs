@@ -99,7 +99,7 @@ pub trait ReceiveInfo: Debug + Default {
 pub struct BasicInfo {
     /// Received Signal Strength Indicator (RSSI) of received packet in dBm
     rssi: i16,
-    /// Link Quality Indicator (LQI) of received packet  
+    /// Link Quality Indicator (LQI) of received packet
     lqi: u16,
 }
 
@@ -224,24 +224,31 @@ pub trait Interrupts {
     fn get_interrupts(&mut self, clear: bool) -> Result<Self::Irq, Self::Error>;
 }
 
+/// Register contains the address and value of a register.
+///
+/// It is primarily intended as a type constraint for the [Registers] trait.
+pub trait Register: Copy + From<u8> + Into<u8> {
+    const ADDRESS: u8;
+}
+
 /// Registers trait provides register level access to the radio device.
 ///
 /// This is generally too low level for use by higher abstractions, however,
 /// is provided for completeness.
-pub trait Registers<R: Copy> {
+pub trait Registers {
     type Error: Debug;
 
     /// Read a register value
-    fn reg_read(&mut self, reg: R) -> Result<u8, Self::Error>;
+    fn read_register<R: Register>(&mut self) -> Result<R, Self::Error>;
 
     /// Write a register value
-    fn reg_write(&mut self, reg: R, value: u8) -> Result<(), Self::Error>;
+    fn write_register<R: Register>(&mut self, value: R) -> Result<(), Self::Error>;
 
     /// Update a register value
-    fn reg_update(&mut self, reg: R, mask: u8, value: u8) -> Result<u8, Self::Error> {
-        let existing = self.reg_read(reg)?;
-        let updated = (existing & !mask) | (value & mask);
-        self.reg_write(reg, updated)?;
+    fn update_register<R: Register>(&mut self, f: fn(R) -> R) -> Result<R, Self::Error> {
+        let existing = self.read_register()?;
+        let updated = f(existing);
+        self.write_register(updated)?;
         Ok(updated)
     }
 }
@@ -253,4 +260,67 @@ use crate::std::str::FromStr;
 fn duration_from_str(s: &str) -> Result<core::time::Duration, humantime::DurationError> {
     let d = humantime::Duration::from_str(s)?;
     Ok(*d)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Register, Registers};
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    struct TestRegister {
+        value: u8,
+    }
+
+    impl From<u8> for TestRegister {
+        fn from(value: u8) -> Self {
+            Self { value }
+        }
+    }
+
+    impl From<TestRegister> for u8 {
+        fn from(reg: TestRegister) -> Self {
+            reg.value
+        }
+    }
+
+    impl Register for TestRegister {
+        const ADDRESS: u8 = 123;
+    }
+
+    struct TestDevice {
+        device_register: u8,
+    }
+
+    impl Registers for TestDevice {
+        type Error = ();
+        fn read_register<R: Register>(&mut self) -> Result<R, Self::Error> {
+            if R::ADDRESS == TestRegister::ADDRESS {
+                Ok(self.device_register.into())
+            } else {
+                Err(())
+            }
+        }
+
+        fn write_register<R: Register>(&mut self, value: R) -> Result<(), Self::Error> {
+            if R::ADDRESS == TestRegister::ADDRESS {
+                self.device_register = value.into();
+                Ok(())
+            } else {
+                Err(())
+            }
+        }
+    }
+
+    #[test]
+    fn update_register() {
+        let mut device = TestDevice { device_register: 0 };
+        device.write_register(TestRegister { value: 1 }).unwrap();
+        device
+            .update_register(|r: TestRegister| (if r.value == 1 { 2 } else { 3 }).into())
+            .unwrap();
+        assert_eq!(
+            device.read_register::<TestRegister>().unwrap(),
+            TestRegister { value: 2 }
+        );
+    }
 }
