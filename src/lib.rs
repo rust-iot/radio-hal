@@ -227,7 +227,7 @@ pub trait Interrupts {
 /// Register contains the address and value of a register.
 ///
 /// It is primarily intended as a type constraint for the [Registers] trait.
-pub trait Register: Copy + From<u8> + Into<u8> {
+pub trait Register<const SIZE: usize>: Copy + From<[u8; SIZE]> + Into<[u8; SIZE]> {
     const ADDRESS: u8;
 }
 
@@ -235,17 +235,17 @@ pub trait Register: Copy + From<u8> + Into<u8> {
 ///
 /// This is generally too low level for use by higher abstractions, however,
 /// is provided for completeness.
-pub trait Registers {
+pub trait Registers<const SIZE: usize> {
     type Error: Debug;
 
     /// Read a register value
-    fn read_register<R: Register>(&mut self) -> Result<R, Self::Error>;
+    fn read_register<R: Register<SIZE>>(&mut self) -> Result<R, Self::Error>;
 
     /// Write a register value
-    fn write_register<R: Register>(&mut self, value: R) -> Result<(), Self::Error>;
+    fn write_register<R: Register<SIZE>>(&mut self, value: R) -> Result<(), Self::Error>;
 
     /// Update a register value
-    fn update_register<R: Register>(&mut self, f: fn(R) -> R) -> Result<R, Self::Error> {
+    fn update_register<R: Register<SIZE>>(&mut self, f: fn(R) -> R) -> Result<R, Self::Error> {
         let existing = self.read_register()?;
         let updated = f(existing);
         self.write_register(updated)?;
@@ -267,60 +267,99 @@ mod tests {
     use crate::{Register, Registers};
 
     #[derive(Clone, Copy, Debug, PartialEq)]
-    struct TestRegister {
+    struct TestRegister1 {
         value: u8,
     }
 
-    impl From<u8> for TestRegister {
-        fn from(value: u8) -> Self {
+    impl From<[u8; 1]> for TestRegister1 {
+        fn from(value: [u8; 1]) -> Self {
+            Self { value: value[0] }
+        }
+    }
+
+    impl From<TestRegister1> for [u8; 1] {
+        fn from(reg: TestRegister1) -> Self {
+            [reg.value]
+        }
+    }
+
+    impl Register<1> for TestRegister1 {
+        const ADDRESS: u8 = 0;
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    struct TestRegister2 {
+        value: [u8; 2],
+    }
+
+    impl From<[u8; 2]> for TestRegister2 {
+        fn from(value: [u8; 2]) -> Self {
             Self { value }
         }
     }
 
-    impl From<TestRegister> for u8 {
-        fn from(reg: TestRegister) -> Self {
+    impl From<TestRegister2> for [u8; 2] {
+        fn from(reg: TestRegister2) -> Self {
             reg.value
         }
     }
 
-    impl Register for TestRegister {
-        const ADDRESS: u8 = 123;
+    impl Register<2> for TestRegister2 {
+        const ADDRESS: u8 = 1;
     }
 
     struct TestDevice {
-        device_register: u8,
+        device_register: [u8; 3],
     }
 
-    impl Registers for TestDevice {
+    impl<const SIZE: usize> Registers<SIZE> for TestDevice {
         type Error = ();
-        fn read_register<R: Register>(&mut self) -> Result<R, Self::Error> {
-            if R::ADDRESS == TestRegister::ADDRESS {
-                Ok(self.device_register.into())
-            } else {
-                Err(())
-            }
+        fn read_register<R: Register<SIZE>>(&mut self) -> Result<R, Self::Error> {
+            let mut result = [0u8; SIZE];
+            result.copy_from_slice(
+                &self.device_register[(R::ADDRESS as usize)..(R::ADDRESS as usize + SIZE)],
+            );
+            Ok(result.into())
         }
 
-        fn write_register<R: Register>(&mut self, value: R) -> Result<(), Self::Error> {
-            if R::ADDRESS == TestRegister::ADDRESS {
-                self.device_register = value.into();
-                Ok(())
-            } else {
-                Err(())
-            }
+        fn write_register<R: Register<SIZE>>(&mut self, value: R) -> Result<(), Self::Error> {
+            self.device_register[(R::ADDRESS as usize)..(R::ADDRESS as usize + SIZE)]
+                .copy_from_slice(&value.into());
+            Ok(())
         }
     }
 
     #[test]
-    fn update_register() {
-        let mut device = TestDevice { device_register: 0 };
-        device.write_register(TestRegister { value: 1 }).unwrap();
+    fn update_register1() {
+        let mut device = TestDevice {
+            device_register: [0; 3],
+        };
+        device.write_register(TestRegister1 { value: 1 }).unwrap();
         device
-            .update_register(|r: TestRegister| (if r.value == 1 { 2 } else { 3 }).into())
+            .update_register(|r: TestRegister1| (if r.value == 1 { [2] } else { [3] }).into())
             .unwrap();
         assert_eq!(
-            device.read_register::<TestRegister>().unwrap(),
-            TestRegister { value: 2 }
+            device.read_register::<TestRegister1>().unwrap(),
+            TestRegister1 { value: 2 }
+        );
+    }
+
+    #[test]
+    fn update_register2() {
+        let mut device = TestDevice {
+            device_register: [0; 3],
+        };
+        device
+            .write_register(TestRegister2 { value: [1, 2] })
+            .unwrap();
+        device
+            .update_register(|r: TestRegister2| {
+                (if r.value == [1, 2] { [2, 3] } else { [3, 4] }).into()
+            })
+            .unwrap();
+        assert_eq!(
+            device.read_register::<TestRegister2>().unwrap(),
+            TestRegister2 { value: [2, 3] }
         );
     }
 }
