@@ -245,7 +245,10 @@ pub trait Registers<const SIZE: usize> {
     fn write_register<R: Register<SIZE>>(&mut self, value: R) -> Result<(), Self::Error>;
 
     /// Update a register value
-    fn update_register<R: Register<SIZE>>(&mut self, f: fn(R) -> R) -> Result<R, Self::Error> {
+    fn update_register<R: Register<SIZE>, F: Fn(R) -> R>(
+        &mut self,
+        f: F,
+    ) -> Result<R, Self::Error> {
         let existing = self.read_register()?;
         let updated = f(existing);
         self.write_register(updated)?;
