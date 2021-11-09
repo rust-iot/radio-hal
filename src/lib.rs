@@ -8,6 +8,7 @@
 
 #![no_std]
 
+use core::convert::TryFrom;
 use core::fmt::Debug;
 
 extern crate chrono;
@@ -227,7 +228,7 @@ pub trait Interrupts {
 /// Register contains the address and value of a register.
 ///
 /// It is primarily intended as a type constraint for the [Registers] trait.
-pub trait Register<const SIZE: usize>: Copy + From<[u8; SIZE]> + Into<[u8; SIZE]> {
+pub trait Register<W=u8>: Copy + TryFrom<W> + Into<W> {
     const ADDRESS: u8;
 }
 
@@ -235,17 +236,17 @@ pub trait Register<const SIZE: usize>: Copy + From<[u8; SIZE]> + Into<[u8; SIZE]
 ///
 /// This is generally too low level for use by higher abstractions, however,
 /// is provided for completeness.
-pub trait Registers<const SIZE: usize> {
+pub trait Registers<W=u8> {
     type Error: Debug;
 
     /// Read a register value
-    fn read_register<R: Register<SIZE>>(&mut self) -> Result<R, Self::Error>;
+    fn read_register<R: Register<W>>(&mut self) -> Result<R, Self::Error>;
 
     /// Write a register value
-    fn write_register<R: Register<SIZE>>(&mut self, value: R) -> Result<(), Self::Error>;
+    fn write_register<R: Register<W>>(&mut self, value: R) -> Result<(), Self::Error>;
 
     /// Update a register value
-    fn update_register<R: Register<SIZE>, F: Fn(R) -> R>(
+    fn update_register<R: Register<W>, F: Fn(R) -> R>(
         &mut self,
         f: F,
     ) -> Result<R, Self::Error> {
