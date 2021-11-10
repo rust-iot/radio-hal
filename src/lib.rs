@@ -8,6 +8,7 @@
 
 #![no_std]
 
+use core::convert::TryFrom;
 use core::fmt::Debug;
 
 extern crate chrono;
@@ -227,7 +228,11 @@ pub trait Interrupts {
 /// Register contains the address and value of a register.
 ///
 /// It is primarily intended as a type constraint for the [Registers] trait.
-pub trait Register<const SIZE: usize>: Copy + From<[u8; SIZE]> + Into<[u8; SIZE]> {
+pub trait Register:
+    Copy + TryFrom<Self::Word, Error = <Self as Register>::Error> + Into<Self::Word>
+{
+    type Word;
+    type Error;
     const ADDRESS: u8;
 }
 
@@ -235,17 +240,17 @@ pub trait Register<const SIZE: usize>: Copy + From<[u8; SIZE]> + Into<[u8; SIZE]
 ///
 /// This is generally too low level for use by higher abstractions, however,
 /// is provided for completeness.
-pub trait Registers<const SIZE: usize> {
+pub trait Registers<Word> {
     type Error: Debug;
 
     /// Read a register value
-    fn read_register<R: Register<SIZE>>(&mut self) -> Result<R, Self::Error>;
+    fn read_register<R: Register<Word = Word>>(&mut self) -> Result<R, Self::Error>;
 
     /// Write a register value
-    fn write_register<R: Register<SIZE>>(&mut self, value: R) -> Result<(), Self::Error>;
+    fn write_register<R: Register<Word = Word>>(&mut self, value: R) -> Result<(), Self::Error>;
 
     /// Update a register value
-    fn update_register<R: Register<SIZE>, F: Fn(R) -> R>(
+    fn update_register<R: Register<Word = Word>, F: Fn(R) -> R>(
         &mut self,
         f: F,
     ) -> Result<R, Self::Error> {
@@ -269,24 +274,28 @@ fn duration_from_str(s: &str) -> Result<core::time::Duration, humantime::Duratio
 mod tests {
     use crate::{Register, Registers};
 
+    use core::convert::{Infallible, TryInto};
+
     #[derive(Clone, Copy, Debug, PartialEq)]
     struct TestRegister1 {
         value: u8,
     }
 
-    impl From<[u8; 1]> for TestRegister1 {
-        fn from(value: [u8; 1]) -> Self {
-            Self { value: value[0] }
+    impl From<u8> for TestRegister1 {
+        fn from(value: u8) -> Self {
+            Self { value: value }
         }
     }
 
-    impl From<TestRegister1> for [u8; 1] {
+    impl From<TestRegister1> for u8 {
         fn from(reg: TestRegister1) -> Self {
-            [reg.value]
+            reg.value
         }
     }
 
-    impl Register<1> for TestRegister1 {
+    impl Register for TestRegister1 {
+        type Word = u8;
+        type Error = Infallible;
         const ADDRESS: u8 = 0;
     }
 
@@ -307,7 +316,9 @@ mod tests {
         }
     }
 
-    impl Register<2> for TestRegister2 {
+    impl Register for TestRegister2 {
+        type Word = [u8; 2];
+        type Error = Infallible;
         const ADDRESS: u8 = 1;
     }
 
@@ -315,19 +326,35 @@ mod tests {
         device_register: [u8; 3],
     }
 
-    impl<const SIZE: usize> Registers<SIZE> for TestDevice {
+    impl Registers<u8> for TestDevice {
         type Error = ();
-        fn read_register<R: Register<SIZE>>(&mut self) -> Result<R, Self::Error> {
-            let mut result = [0u8; SIZE];
-            result.copy_from_slice(
-                &self.device_register[(R::ADDRESS as usize)..(R::ADDRESS as usize + SIZE)],
-            );
-            Ok(result.into())
+        fn read_register<R: Register<Word = u8>>(&mut self) -> Result<R, Self::Error> {
+            self.device_register[R::ADDRESS as usize]
+                .try_into()
+                .map_err(|_| ())
         }
 
-        fn write_register<R: Register<SIZE>>(&mut self, value: R) -> Result<(), Self::Error> {
-            self.device_register[(R::ADDRESS as usize)..(R::ADDRESS as usize + SIZE)]
-                .copy_from_slice(&value.into());
+        fn write_register<R: Register<Word = u8>>(&mut self, value: R) -> Result<(), Self::Error> {
+            self.device_register[R::ADDRESS as usize] = value.into();
+            Ok(())
+        }
+    }
+
+    impl Registers<[u8; 2]> for TestDevice {
+        type Error = ();
+        fn read_register<R: Register<Word = [u8; 2]>>(&mut self) -> Result<R, Self::Error> {
+            let addr = R::ADDRESS as usize;
+            let mut result = [0u8; 2];
+            result.copy_from_slice(&self.device_register[addr..addr + 2]);
+            result.try_into().map_err(|_| ())
+        }
+
+        fn write_register<R: Register<Word = [u8; 2]>>(
+            &mut self,
+            value: R,
+        ) -> Result<(), Self::Error> {
+            let addr = R::ADDRESS as usize;
+            self.device_register[addr..addr + 2].copy_from_slice(&value.into());
             Ok(())
         }
     }
@@ -339,7 +366,7 @@ mod tests {
         };
         device.write_register(TestRegister1 { value: 1 }).unwrap();
         device
-            .update_register(|r: TestRegister1| (if r.value == 1 { [2] } else { [3] }).into())
+            .update_register(|r: TestRegister1| (if r.value == 1 { 2 } else { 3 }).into())
             .unwrap();
         assert_eq!(
             device.read_register::<TestRegister1>().unwrap(),
