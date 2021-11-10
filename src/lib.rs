@@ -228,8 +228,22 @@ pub trait Interrupts {
 /// Register contains the address and value of a register.
 ///
 /// It is primarily intended as a type constraint for the [Registers] trait.
-pub trait Register<W=u8>: Copy + TryFrom<W> + Into<W> {
+pub trait Register: Copy {
     const ADDRESS: u8;
+    type Word;
+}
+
+/// Internal register trait, automatically implemented for types
+/// implementing [Register] as well as [TryFrom] and [Into] for [Register::Word]
+pub trait Reg<W>: Register<Word=W> + TryFrom<W> + Into<W> + private::Sealed {}
+
+impl <W, T: Register<Word=W> + TryFrom<W> + Into<W>> Reg<W> for T {}
+
+/// Seal the [Reg] trait so this cannot be constructed externally
+impl <W, T: Register<Word=W> + TryFrom<W> + Into<W>> private::Sealed for T {}
+
+mod private {
+    pub trait Sealed {}
 }
 
 /// Registers trait provides register level access to the radio device.
@@ -240,13 +254,13 @@ pub trait Registers<W=u8> {
     type Error: Debug;
 
     /// Read a register value
-    fn read_register<R: Register<W>>(&mut self) -> Result<R, Self::Error>;
+    fn read_register<R: Reg<W>>(&mut self) -> Result<R, Self::Error>;
 
     /// Write a register value
-    fn write_register<R: Register<W>>(&mut self, value: R) -> Result<(), Self::Error>;
+    fn write_register<R: Reg<W>>(&mut self, value: R) -> Result<(), Self::Error>;
 
     /// Update a register value
-    fn update_register<R: Register<W>, F: Fn(R) -> R>(
+    fn update_register<R: Reg<W>, F: Fn(R) -> R>(
         &mut self,
         f: F,
     ) -> Result<R, Self::Error> {
