@@ -3,11 +3,6 @@
 //! ## https://github.com/ryankurte/rust-radio
 //! ## Copyright 2020 Ryan Kurte
 
-use embedded_hal::delay::blocking::DelayUs;
-use humantime::Duration as HumanDuration;
-use structopt::StructOpt;
-
-extern crate std;
 use std::ffi::CString;
 use std::fs::{File, OpenOptions};
 use std::prelude::v1::*;
@@ -15,6 +10,12 @@ use std::string::String;
 use std::time::SystemTime;
 
 use libc::{self};
+
+use log::{debug, info};
+
+use embedded_hal::delay::blocking::DelayUs;
+use humantime::Duration as HumanDuration;
+use structopt::StructOpt;
 
 use byteorder::{ByteOrder, NetworkEndian};
 use pcap_file::{pcap::PcapHeader, DataLink, PcapWriter};

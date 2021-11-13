@@ -9,13 +9,14 @@
 use core::fmt::Debug;
 use core::time::Duration;
 
+use log::debug;
 use embedded_hal::delay::blocking::DelayUs;
 
 #[cfg(feature = "structopt")]
 use structopt::StructOpt;
 
 #[cfg(feature = "std")]
-use crate::std::string::ToString;
+use std::string::ToString;
 
 use crate::{Receive, State, Transmit};
 

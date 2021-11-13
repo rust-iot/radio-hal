@@ -6,25 +6,16 @@
 //! ## https://github.com/ryankurte/rust-radio
 //! ## Copyright 2020 Ryan Kurte
 
-#![no_std]
+// Set `no_std` where `std` feature is disabled
+#![cfg_attr(not(feature="std"), no_std)]
 
-use core::convert::TryFrom;
+use core::convert::{TryFrom, TryInto};
 use core::fmt::Debug;
 
-extern crate chrono;
-extern crate nb;
-
-#[macro_use]
-extern crate log;
-
-extern crate embedded_hal;
-
-#[cfg(feature = "std")]
-extern crate std;
-
 pub mod config;
-
 pub mod blocking;
+
+pub mod modulation;
 
 #[cfg(feature = "helpers")]
 pub mod helpers;
@@ -150,7 +141,7 @@ pub trait Channel {
     type Error: Debug;
 
     /// Set the radio channel for future transmit and receive operations
-    fn set_channel(&mut self, channel: &Self::Channel) -> Result<(), Self::Error>;
+    fn set_channel<C: TryInto<Self::Channel>>(&mut self, channel: C) -> Result<(), Self::Error>;
 }
 
 /// Power trait for configuring radio power
@@ -261,10 +252,10 @@ pub trait Registers<Word> {
     }
 }
 
-#[cfg(feature = "structopt")]
-use crate::std::str::FromStr;
+#[cfg(feature = "std")]
+use std::str::FromStr;
 
-#[cfg(feature = "structopt")]
+#[cfg(feature = "std")]
 fn duration_from_str(s: &str) -> Result<core::time::Duration, humantime::DurationError> {
     let d = humantime::Duration::from_str(s)?;
     Ok(*d)
