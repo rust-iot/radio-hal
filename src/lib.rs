@@ -7,13 +7,13 @@
 //! ## Copyright 2020 Ryan Kurte
 
 // Set `no_std` where `std` feature is disabled
-#![cfg_attr(not(feature="std"), no_std)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 use core::convert::TryFrom;
 use core::fmt::Debug;
 
-pub mod config;
 pub mod blocking;
+pub mod config;
 
 #[cfg(feature = "helpers")]
 pub mod helpers;

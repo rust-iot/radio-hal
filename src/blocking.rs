@@ -9,8 +9,8 @@
 use core::fmt::Debug;
 use core::time::Duration;
 
-use log::debug;
 use embedded_hal::delay::blocking::DelayUs;
+use log::debug;
 
 #[cfg(feature = "structopt")]
 use structopt::StructOpt;
