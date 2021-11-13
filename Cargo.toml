@@ -11,16 +11,17 @@ version = "0.10.0"
 all-features = true
 
 [features]
+std = []
 nonblocking = [ ]
 mock = [ "embedded-hal-mock" ]
-std = []
 helpers = [ "structopt", "humantime", "std", "pcap-file", "libc", "byteorder", "rolling-stats" ]
 default = []
 
 [dependencies]
 embedded-hal = "1.0.0-alpha.5"
 nb = "1.0.0"
-log = "0.4.14"
+
+log = { version = "0.4.14", default_features = false }
 
 humantime = { version = "2.0.1", optional = true }
 pcap-file = { version = "1.1.1", optional = true }
