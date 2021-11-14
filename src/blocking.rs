@@ -10,7 +10,12 @@ use core::fmt::Debug;
 use core::time::Duration;
 
 use embedded_hal::delay::blocking::DelayUs;
+
+#[cfg(feature="log")]
 use log::debug;
+
+#[cfg(feature="defmt")]
+use defmt::debug;
 
 #[cfg(feature = "structopt")]
 use structopt::StructOpt;
@@ -23,6 +28,7 @@ use crate::{Receive, State, Transmit};
 /// BlockingOptions for blocking radio functions
 #[derive(Clone, PartialEq, Debug)]
 #[cfg_attr(feature = "structopt", derive(StructOpt))]
+#[cfg_attr(feature="defmt", derive(defmt::Format))]
 pub struct BlockingOptions {
     /// Interval for polling for device state
     #[cfg_attr(feature="structopt", structopt(long, default_value="100us", parse(try_from_str=crate::duration_from_str)))]
@@ -45,6 +51,7 @@ impl Default for BlockingOptions {
 /// BlockingError wraps radio error type to provie a `Timeout` variant
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "thiserror", derive(thiserror::Error))]
+#[cfg_attr(feature="defmt", derive(defmt::Format))]
 pub enum BlockingError<E> {
     #[cfg_attr(feature = "thiserror", error("Inner: {0}"))]
     Inner(E),
@@ -111,6 +118,7 @@ where
         loop {
             // Check for transmit complete
             if self.check_transmit()? {
+                #[cfg(any(feature="log", feature="defmt"))]
                 debug!("Blocking send complete");
                 break;
             }
@@ -118,6 +126,7 @@ where
             // Update poll time and timeout if overrun
             c += tx_options.poll_interval.as_micros();
             if c > t {
+                #[cfg(any(feature="log", feature="defmt"))]
                 debug!("Blocking send timeout");
                 return Err(BlockingError::Timeout);
             }
@@ -201,6 +210,7 @@ where
 
             c += rx_options.poll_interval.as_micros();
             if c > t {
+                #[cfg(any(feature="log", feature="defmt"))]
                 debug!("Blocking receive timeout");
                 return Err(BlockingError::Timeout);
             }
@@ -248,6 +258,7 @@ where
             // Timeout eventually
             c += options.poll_interval.as_micros();
             if c > t {
+                #[cfg(any(feature="log", feature="defmt"))]
                 debug!("Blocking receive timeout");
                 return Err(BlockingError::Timeout);
             }
