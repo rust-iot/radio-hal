@@ -34,30 +34,22 @@ pub enum ConfigOption {
     Promiscuous(bool),
 }
 
-/// Radio configuration errors
-/// This should be extended with errors generally relevant to configuration,
-/// with radio-specific errors passed through the Other(E) field.
-#[non_exhaustive]
-#[derive(Clone, Debug, PartialEq)]
-pub enum ConfigError<E> {
-    /// Configuration option not supported
-    NotSupported,
-
-    /// Other (device, non-configuration errors)
-    Other(E),
+pub trait ConfigError {
+    /// Indicates a configuration option is not supported
+    fn not_supported() -> bool;
 }
 
 /// Configure trait implemented by configurable radios
 pub trait Configure {
     /// Radio error
-    type Error;
+    type Error: ConfigError;
 
     /// Set a configuration option
     /// Returns Ok(true) on set, Ok(false) for unsupported options, Err(Self::Error) for errors
-    fn set_option(&mut self, o: &ConfigOption) -> Result<(), ConfigError<Self::Error>>;
+    fn set_option(&mut self, o: &ConfigOption) -> Result<(), Self::Error>;
 
     /// Fetch a configuration option
     /// This will overwrite the value of the provided option enum
     /// Returns Ok(true) on successful get, Ok(false) for unsupported options, Err(Self::Error) for errors
-    fn get_option(&mut self, o: &mut ConfigOption) -> Result<(), ConfigError<Self::Error>>;
+    fn get_option(&mut self, o: &mut ConfigOption) -> Result<(), Self::Error>;
 }

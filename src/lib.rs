@@ -14,6 +14,7 @@ use core::fmt::Debug;
 
 pub mod blocking;
 pub mod config;
+pub mod modulation;
 
 #[cfg(feature = "helpers")]
 pub mod helpers;
@@ -125,15 +126,15 @@ impl From<u16> for BasicChannel {
     }
 }
 
-impl Into<u16> for BasicChannel {
-    fn into(self) -> u16 {
-        self.0
+impl From<BasicChannel> for u16 {
+    fn from(ch: BasicChannel) -> u16 {
+        ch.0
     }
 }
 
 /// Channel trait for configuring radio channelization
 pub trait Channel {
-    /// Channel information
+    /// Radio channel type
     type Channel: Debug;
     /// Radio error type
     type Error: Debug;
