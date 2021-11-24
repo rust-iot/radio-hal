@@ -18,7 +18,7 @@ helpers = [ "structopt", "humantime", "std", "pcap-file", "libc", "byteorder", "
 default = []
 
 [dependencies]
-embedded-hal = "1.0.0-alpha.5"
+embedded-hal = "1.0.0-alpha.6"
 nb = "1.0.0"
 
 log = { version = "0.4.14", optional = true, default_features = false }

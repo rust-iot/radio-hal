@@ -102,7 +102,7 @@ pub trait BlockingTransmit<E: Debug> {
 
 impl<T, E> BlockingTransmit<E> for T
 where
-    T: Transmit<Error = E> + DelayUs<u32>,
+    T: Transmit<Error = E> + DelayUs,
     E: Debug,
 {
     fn do_transmit(
@@ -187,7 +187,7 @@ pub trait BlockingReceive<I, E> {
 
 impl<T, I, E> BlockingReceive<I, E> for T
 where
-    T: Receive<Info = I, Error = E> + DelayUs<u32>,
+    T: Receive<Info = I, Error = E> + DelayUs,
     <T as Receive>::Info: Debug,
     I: Debug,
     E: Debug,
@@ -231,7 +231,7 @@ pub trait BlockingSetState<S, E> {
 
 impl<T, S, E> BlockingSetState<S, E> for T
 where
-    T: State<State = S, Error = E> + DelayUs<u32>,
+    T: State<State = S, Error = E> + DelayUs,
     S: Debug + core::cmp::PartialEq + Copy,
     E: Debug,
 {
