@@ -1,14 +1,16 @@
 //! Common LoRa modulation options
 
+use super::Freq;
+
 /// LoRa mode channel configuration
 #[derive(Clone, PartialEq, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 
 pub struct LoRaChannel {
     /// LoRa frequency in kHz
-    pub freq_khz: u32,
+    pub freq: Freq,
     /// LoRa channel bandwidth
-    pub bw_khz: u16,
+    pub bw: Freq,
     /// LoRa Spreading Factor
     pub sf: SpreadingFactor,
     /// LoRa Coding rate

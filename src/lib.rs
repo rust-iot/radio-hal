@@ -12,6 +12,9 @@
 use core::convert::TryFrom;
 use core::fmt::Debug;
 
+#[cfg(feature = "std")]
+use std::str::FromStr;
+
 pub mod blocking;
 pub mod config;
 pub mod modulation;
@@ -23,13 +26,12 @@ pub mod mock;
 #[cfg(feature = "nonblocking")]
 pub mod nonblocking;
 
-/// Radio trait combines Base, Configure, Send and Receive for a generic radio object
+/// Radio trait combines Transmit, Receive, and State for a generic radio object
 pub trait Radio: Transmit + Receive + State {}
-
 /// Transmit trait for radios that can transmit packets
 ///
 /// `start_transmit` should be called to load data into the radio, with `check_transmit` called
-/// periodically (or using interrupts) to continue and finalise the transmission.
+/// periodically (or triggered by interrupts) to continue and finalise the transmission.
 pub trait Transmit {
     /// Radio error
     type Error: Debug;
@@ -48,8 +50,10 @@ pub trait Transmit {
 /// Receive trait for radios that can receive packets
 ///
 /// `start_receive` should be used to setup the radio in receive mode, with `check_receive` called
-/// periodically (or using interrupts) to poll for packet reception. Once a packet has been received,
-/// `get_received` fetches the received packet (and associated info) from the radio.
+/// periodically (or triggered by interrupts) to poll for packet reception. Once a packet has been received,
+/// `get_received` fetches the received packet (and associated information) from the radio.
+///
+/// If you need to check for an receive operation in progress check out the [`Busy`] (or [`State`]) traits.
 pub trait Receive {
     /// Radio error
     type Error: Debug;
@@ -250,9 +254,6 @@ pub trait Registers<Word> {
         Ok(updated)
     }
 }
-
-#[cfg(feature = "std")]
-use std::str::FromStr;
 
 #[cfg(feature = "std")]
 fn duration_from_str(s: &str) -> Result<core::time::Duration, humantime::DurationError> {

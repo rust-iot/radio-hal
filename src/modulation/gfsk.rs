@@ -1,14 +1,16 @@
 //! Common GFSK modulation options
 
+use super::Freq;
+
 /// Basic GFSK channel configuration
 #[derive(Clone, PartialEq, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct GfskChannel {
-    /// Channel frequency in kHz
-    pub freq_khz: u32,
+    /// Channel frequency
+    pub freq: Freq,
 
-    /// Channel bandwidth in kHz
-    pub bw_khz: u16,
+    /// Channel bandwidth
+    pub bw_khz: Freq,
 
     /// Bitrate in bps
     pub bitrate_bps: u32,

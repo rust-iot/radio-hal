@@ -3,7 +3,7 @@
 //! These implementations use the radio's DelayUs implementation to
 //! poll on completion of operations.
 //!
-//! ## https://github.com/ryankurte/rust-radio
+//! ## <https://github.com/ryankurte/rust-radio>
 //! ## Copyright 2020 Ryan Kurte
 
 use core::fmt::Debug;
