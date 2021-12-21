@@ -5,7 +5,7 @@ repository = "https://github.com/rust-iot/radio-hal"
 authors = ["Ryan Kurte <ryankurte@gmail.com>"]
 license = "MIT"
 edition = "2018"
-version = "0.10.0"
+version = "0.10.1"
 
 [package.metadata.docs.rs]
 all-features = true
