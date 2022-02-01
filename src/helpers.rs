@@ -55,7 +55,7 @@ where
         + Receive<Info = I, Error = E>
         + Rssi<Error = E>
         + Power<Error = E>
-        + DelayUs<u32, Error = E>,
+        + DelayUs<Error = E>,
     I: ReceiveInfo + Default + std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -95,7 +95,7 @@ pub struct TransmitOptions {
 
 pub fn do_transmit<T, E>(radio: &mut T, options: TransmitOptions) -> Result<(), BlockingError<E>>
 where
-    T: Transmit<Error = E> + Power<Error = E> + DelayUs<u32, Error = E>,
+    T: Transmit<Error = E> + Power<Error = E> + DelayUs<Error = E>,
     E: core::fmt::Debug,
 {
     // Set output power if specified
@@ -210,7 +210,7 @@ pub fn do_receive<T, I, E>(
     options: ReceiveOptions,
 ) -> Result<usize, E>
 where
-    T: Receive<Info = I, Error = E> + DelayUs<u32, Error = E>,
+    T: Receive<Info = I, Error = E> + DelayUs<Error = E>,
     I: std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -273,7 +273,7 @@ pub struct RssiOptions {
 
 pub fn do_rssi<T, I, E>(radio: &mut T, options: RssiOptions) -> Result<(), E>
 where
-    T: Receive<Info = I, Error = E> + Rssi<Error = E> + DelayUs<u32, Error = E>,
+    T: Receive<Info = I, Error = E> + Rssi<Error = E> + DelayUs<Error = E>,
     I: std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -327,10 +327,7 @@ pub fn do_echo<T, I, E>(
     options: EchoOptions,
 ) -> Result<usize, BlockingError<E>>
 where
-    T: Receive<Info = I, Error = E>
-        + Transmit<Error = E>
-        + Power<Error = E>
-        + DelayUs<u32, Error = E>,
+    T: Receive<Info = I, Error = E> + Transmit<Error = E> + Power<Error = E> + DelayUs<Error = E>,
     I: ReceiveInfo + std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -414,10 +411,7 @@ pub fn do_ping_pong<T, I, E>(
     options: PingPongOptions,
 ) -> Result<LinkTestInfo, BlockingError<E>>
 where
-    T: Receive<Info = I, Error = E>
-        + Transmit<Error = E>
-        + Power<Error = E>
-        + DelayUs<u32, Error = E>,
+    T: Receive<Info = I, Error = E> + Transmit<Error = E> + Power<Error = E> + DelayUs<Error = E>,
     I: ReceiveInfo,
     E: std::fmt::Debug,
 {
