@@ -270,7 +270,7 @@ impl<St, Inf, Irq, E> From<Option<E>> for Response<St, Inf, Irq, E> {
     }
 }
 
-impl<St, Reg, Ch, Inf, Irq, E> DelayUs<u32> for Radio<St, Reg, Ch, Inf, Irq, E>
+impl<St, Reg, Ch, Inf, Irq, E> DelayUs for Radio<St, Reg, Ch, Inf, Irq, E>
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
