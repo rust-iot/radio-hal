@@ -11,7 +11,12 @@ use std::time::SystemTime;
 
 use libc::{self};
 
+#[cfg(feature = "log")]
 use log::{debug, info};
+
+#[cfg(feature = "defmt")]
+use defmt::{debug, info};
+
 
 use embedded_hal::delay::blocking::DelayUs;
 use humantime::Duration as HumanDuration;
@@ -182,6 +187,7 @@ impl PcapOptions {
             _ => unimplemented!(),
         };
 
+        #[cfg(any(feature = "log", feature = "defmt"))]
         info!("pcap pipe open, awaiting connection");
 
         // Setup pcap writer and write header

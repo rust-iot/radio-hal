@@ -14,7 +14,7 @@ all-features = true
 std = [ ]
 nonblocking = [ ]
 mock = [ "embedded-hal-mock" ]
-helpers = [ "structopt", "humantime", "std", "pcap-file", "libc", "byteorder", "rolling-stats" ]
+helpers = [ "structopt", "humantime", "std", "pcap-file", "libc", "byteorder", "rolling-stats", "log" ]
 default = []
 
 [dependencies]
