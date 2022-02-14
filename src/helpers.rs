@@ -327,7 +327,10 @@ pub fn do_echo<T, I, E>(
     options: EchoOptions,
 ) -> Result<usize, BlockingError<E>>
 where
-    T: Receive<Info = I, Error = E> + Transmit<Error = E> + Power<Error = E> + DelayUs<Error = E>,
+    T: Receive<Info = I, Error = E>
+        + Transmit<Error = E>
+        + Power<Error = E>
+        + DelayUs<Error = E>,
     I: ReceiveInfo + std::fmt::Debug,
     E: std::fmt::Debug,
 {

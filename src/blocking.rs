@@ -11,7 +11,7 @@ use core::time::Duration;
 
 use embedded_hal::delay::blocking::DelayUs;
 
-#[cfg(feature = "log")]
+#[cfg(not(feature = "defmt"))]
 use log::debug;
 
 #[cfg(feature = "defmt")]

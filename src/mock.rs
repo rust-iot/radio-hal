@@ -11,9 +11,10 @@ use std::convert::Infallible;
 use std::fmt::Debug;
 use std::vec::Vec;
 
+use log::{debug};
+
 use embedded_hal::delay::blocking::DelayUs;
 
-extern crate embedded_hal_mock;
 use embedded_hal_mock::common::Generic;
 
 use crate::{
