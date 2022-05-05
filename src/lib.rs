@@ -3,8 +3,8 @@
 //! This package defines traits for packet radio devices, as well as blocking and async
 //! implementations using these traits, and a mock device to support application level testing.
 //!
-//! ## https://github.com/ryankurte/rust-radio
-//! ## Copyright 2020 Ryan Kurte
+//! ## <https://github.com/rust-iot/radio-hal>
+//! ## Copyright 2020-2022 Ryan Kurte
 
 // Set `no_std` where `std` feature is disabled
 #![cfg_attr(not(feature = "std"), no_std)]

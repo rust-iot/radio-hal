@@ -3,8 +3,8 @@
 //! This provides a generic and specific mock implementation of the radio traits
 //! to support network and application level testing.
 //!
-//! ## https://github.com/ryankurte/rust-radio
-//! ## Copyright 2020 Ryan Kurte
+//! ## <https://github.com/rust-iot/radio-hal>
+//! ## Copyright 2020-2022 Ryan Kurte
 
 extern crate std;
 use std::convert::Infallible;

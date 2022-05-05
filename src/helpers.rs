@@ -1,7 +1,7 @@
 //! Provides common helpers for implementing radio utilities
 //!
-//! ## https://github.com/ryankurte/rust-radio
-//! ## Copyright 2020 Ryan Kurte
+//! ## <https://github.com/rust-iot/radio-hal>
+//! ## Copyright 2020-2022 Ryan Kurte
 
 use std::ffi::CString;
 use std::fs::{File, OpenOptions};
@@ -11,7 +11,7 @@ use std::time::SystemTime;
 
 use libc::{self};
 
-#[cfg(feature = "log")]
+#[cfg(not(feature = "defmt"))]
 use log::{debug, info};
 
 #[cfg(feature = "defmt")]
@@ -235,7 +235,10 @@ where
 
             match std::str::from_utf8(&buff[0..n as usize]) {
                 Ok(s) => info!("Received: '{}' info: {:?}", s, i),
-                Err(_) => info!("Received: '{:x?}' info: {:?}", &buff[0..n as usize], i),
+                #[cfg(not(feature = "defmt"))]
+                Err(_) => info!("Received: '{:02x?}' info: {:?}", &buff[0..n as usize], i),
+                #[cfg(feature = "defmt")]
+                Err(_) => info!("Received: '{:?}' info: {:?}", &buff[0..n as usize], i),
             }
 
             if let Some(p) = &mut pcap_writer {
@@ -356,7 +359,10 @@ where
             // Parse out string if possible, otherwise print hex
             match std::str::from_utf8(&buff[0..n as usize]) {
                 Ok(s) => info!("Received: '{}' info: {:?}", s, i),
+                #[cfg(not(feature = "defmt"))]
                 Err(_) => info!("Received: '{:02x?}' info: {:?}", &buff[0..n as usize], i),
+                #[cfg(feature = "defmt")]
+                Err(_) => info!("Received: '{:?}' info: {:?}", &buff[0..n as usize], i),
             }
 
             // Append info if provided

@@ -3,15 +3,15 @@
 //! These implementations use the radio's DelayUs implementation to
 //! poll on completion of operations.
 //!
-//! ## https://github.com/ryankurte/rust-radio
-//! ## Copyright 2020 Ryan Kurte
+//! ## <https://github.com/rust-iot/radio-hal>
+//! ## Copyright 2020-2022 Ryan Kurte
 
 use core::fmt::Debug;
 use core::time::Duration;
 
 use embedded_hal::delay::blocking::DelayUs;
 
-#[cfg(feature = "log")]
+#[cfg(not(feature = "defmt"))]
 use log::debug;
 
 #[cfg(feature = "defmt")]
