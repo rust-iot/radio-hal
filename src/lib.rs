@@ -125,9 +125,9 @@ impl From<u16> for BasicChannel {
     }
 }
 
-impl Into<u16> for BasicChannel {
-    fn into(self) -> u16 {
-        self.0
+impl From<BasicChannel> for u16 {
+    fn from(val: BasicChannel) -> Self {
+        val.0
     }
 }
 
@@ -272,7 +272,7 @@ mod tests {
 
     impl From<u8> for TestRegister1 {
         fn from(value: u8) -> Self {
-            Self { value: value }
+            Self { value }
         }
     }
 

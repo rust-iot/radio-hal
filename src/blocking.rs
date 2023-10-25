@@ -11,9 +11,6 @@ use core::time::Duration;
 
 use embedded_hal::delay::DelayUs;
 
-#[cfg(not(feature = "defmt"))]
-use log::debug;
-
 #[cfg(feature = "defmt")]
 use defmt::debug;
 
@@ -132,7 +129,7 @@ where
             }
 
             // Wait for next poll
-            let _ = self.delay_us(tx_options.poll_interval.as_micros() as u32);
+            self.delay_us(tx_options.poll_interval.as_micros() as u32);
         }
 
         Ok(())
@@ -215,7 +212,7 @@ where
                 return Err(BlockingError::Timeout);
             }
 
-            let _ = self.delay_us(rx_options.poll_interval.as_micros() as u32);
+            self.delay_us(rx_options.poll_interval.as_micros() as u32);
         }
     }
 }
@@ -264,7 +261,7 @@ where
             }
 
             // Delay before next loop
-            let _ = self.delay_us(options.poll_interval.as_micros() as u32);
+            self.delay_us(options.poll_interval.as_micros() as u32);
         }
     }
 }
