@@ -9,7 +9,7 @@
 use core::fmt::Debug;
 use core::time::Duration;
 
-use embedded_hal::delay::blocking::DelayUs;
+use embedded_hal::delay::DelayUs;
 
 #[cfg(not(feature = "defmt"))]
 use log::debug;
@@ -17,8 +17,8 @@ use log::debug;
 #[cfg(feature = "defmt")]
 use defmt::debug;
 
-#[cfg(feature = "structopt")]
-use structopt::StructOpt;
+#[cfg(feature = "clap")]
+use clap::Parser;
 
 #[cfg(feature = "std")]
 use std::string::ToString;
@@ -27,15 +27,15 @@ use crate::{Receive, State, Transmit};
 
 /// BlockingOptions for blocking radio functions
 #[derive(Clone, PartialEq, Debug)]
-#[cfg_attr(feature = "structopt", derive(StructOpt))]
+#[cfg_attr(feature = "clap", derive(Parser))]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct BlockingOptions {
     /// Interval for polling for device state
-    #[cfg_attr(feature="structopt", structopt(long, default_value="100us", parse(try_from_str=crate::duration_from_str)))]
+    #[cfg_attr(feature="clap", clap(long, default_value="100us", value_parser=crate::duration_from_str))]
     pub poll_interval: Duration,
 
     /// Timeout for blocking operation
-    #[cfg_attr(feature="structopt", structopt(long, default_value="100ms", parse(try_from_str=crate::duration_from_str)))]
+    #[cfg_attr(feature="clap", clap(long, default_value="100ms", value_parser=crate::duration_from_str))]
     pub timeout: Duration,
 }
 
@@ -73,7 +73,7 @@ impl<E> From<E> for BlockingError<E> {
 ```
 # use radio::*;
 # use radio::mock::*;
-use radio::blocking::{BlockingTransmit, BlockingOptions};
+use radio::{BlockingTransmit, BlockingOptions};
 
 # let mut radio = MockRadio::new(&[
 #    Transaction::start_transmit(vec![0xaa, 0xbb], None),
@@ -147,7 +147,7 @@ where
 ```
 # use radio::*;
 # use radio::mock::*;
-use radio::blocking::{BlockingReceive, BlockingOptions};
+use radio::{BlockingReceive, BlockingOptions};
 
 let data = [0xaa, 0xbb];
 let info = BasicInfo::new(-81, 0);

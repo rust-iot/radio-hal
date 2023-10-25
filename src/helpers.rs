@@ -17,38 +17,40 @@ use log::{debug, info};
 #[cfg(feature = "defmt")]
 use defmt::{debug, info};
 
-
-use embedded_hal::delay::blocking::DelayUs;
+use clap::Parser;
+use embedded_hal::delay::DelayUs;
 use humantime::Duration as HumanDuration;
-use structopt::StructOpt;
 
 use byteorder::{ByteOrder, NetworkEndian};
 use pcap_file::{pcap::PcapHeader, DataLink, PcapWriter};
 use rolling_stats::Stats;
 
-use crate::blocking::*;
-use crate::{Power, Receive, ReceiveInfo, Rssi, Transmit};
+use crate::*;
+use crate::{
+    blocking::{BlockingError, BlockingOptions, BlockingReceive, BlockingTransmit},
+    Power, Receive, ReceiveInfo, Rssi, Transmit,
+};
 
 /// Basic operations supported by the helpers package
-#[derive(Clone, StructOpt, PartialEq, Debug)]
+#[derive(Clone, Parser, PartialEq, Debug)]
 pub enum Operation {
-    #[structopt(name = "tx")]
+    #[clap(name = "tx")]
     /// Transmit a packet
     Transmit(TransmitOptions),
 
-    #[structopt(name = "rx")]
+    #[clap(name = "rx")]
     /// Receive a packet
     Receive(ReceiveOptions),
 
-    #[structopt(name = "rssi")]
+    #[clap(name = "rssi")]
     /// Poll RSSI on the configured channel
     Rssi(RssiOptions),
 
-    #[structopt(name = "echo")]
+    #[clap(name = "echo")]
     /// Echo back received messages (useful with Link Test mode)
     Echo(EchoOptions),
 
-    #[structopt(name = "ping-pong")]
+    #[clap(name = "ping-pong")]
     /// Link test (ping-pong) mode
     LinkTest(PingPongOptions),
 }
@@ -60,7 +62,7 @@ where
         + Receive<Info = I, Error = E>
         + Rssi<Error = E>
         + Power<Error = E>
-        + DelayUs<Error = E>,
+        + DelayUs,
     I: ReceiveInfo + Default + std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -80,27 +82,27 @@ where
 }
 
 /// Configuration for Transmit operation
-#[derive(Clone, StructOpt, PartialEq, Debug)]
+#[derive(Clone, Parser, PartialEq, Debug)]
 pub struct TransmitOptions {
     /// Data to be transmitted
-    #[structopt(long)]
+    #[clap(long)]
     pub data: Vec<u8>,
 
     /// Power in dBm (range -18dBm to 13dBm)
-    #[structopt(long)]
+    #[clap(long)]
     pub power: Option<i8>,
 
     /// Specify period for repeated transmission
-    #[structopt(long)]
+    #[clap(long)]
     pub period: Option<HumanDuration>,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub blocking_options: BlockingOptions,
 }
 
 pub fn do_transmit<T, E>(radio: &mut T, options: TransmitOptions) -> Result<(), BlockingError<E>>
 where
-    T: Transmit<Error = E> + Power<Error = E> + DelayUs<Error = E>,
+    T: Transmit<Error = E> + Power<Error = E> + DelayUs,
     E: core::fmt::Debug,
 {
     // Set output power if specified
@@ -114,7 +116,7 @@ where
 
         // Delay for repeated transmission or exit
         match &options.period {
-            Some(p) => radio.delay_us(p.as_micros() as u32).unwrap(),
+            Some(p) => radio.delay_us(p.as_micros() as u32),
             None => break,
         }
     }
@@ -123,28 +125,28 @@ where
 }
 
 /// Configuration for Receive operation
-#[derive(Clone, StructOpt, PartialEq, Debug)]
+#[derive(Clone, Parser, PartialEq, Debug)]
 pub struct ReceiveOptions {
     /// Run continuously
-    #[structopt(long = "continuous")]
+    #[clap(long = "continuous")]
     pub continuous: bool,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub pcap_options: PcapOptions,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub blocking_options: BlockingOptions,
 }
 
-#[derive(Clone, StructOpt, PartialEq, Debug)]
+#[derive(Clone, Parser, PartialEq, Debug)]
 
 pub struct PcapOptions {
     /// Create and write capture output to a PCAP file
-    #[structopt(long, group = "1")]
+    #[clap(long, group = "1")]
     pub pcap_file: Option<String>,
 
     /// Create and write to a unix pipe for connection to wireshark
-    #[structopt(long, group = "1")]
+    #[clap(long, group = "1")]
     pub pcap_pipe: Option<String>,
 }
 
@@ -216,7 +218,7 @@ pub fn do_receive<T, I, E>(
     options: ReceiveOptions,
 ) -> Result<usize, E>
 where
-    T: Receive<Info = I, Error = E> + DelayUs<Error = E>,
+    T: Receive<Info = I, Error = E> + DelayUs,
     I: std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -262,27 +264,25 @@ where
             radio.start_receive()?;
         }
 
-        radio
-            .delay_us(options.blocking_options.poll_interval.as_micros() as u32)
-            .unwrap();
+        radio.delay_us(options.blocking_options.poll_interval.as_micros() as u32);
     }
 }
 
 /// Configuration for RSSI operation
-#[derive(Clone, StructOpt, PartialEq, Debug)]
+#[derive(Clone, Parser, PartialEq, Debug)]
 pub struct RssiOptions {
     /// Specify period for RSSI polling
-    #[structopt(long = "period", default_value = "1s")]
+    #[clap(long = "period", default_value = "1s")]
     pub period: HumanDuration,
 
     /// Run continuously
-    #[structopt(long = "continuous")]
+    #[clap(long = "continuous")]
     pub continuous: bool,
 }
 
 pub fn do_rssi<T, I, E>(radio: &mut T, options: RssiOptions) -> Result<(), E>
 where
-    T: Receive<Info = I, Error = E> + Rssi<Error = E> + DelayUs<Error = E>,
+    T: Receive<Info = I, Error = E> + Rssi<Error = E> + DelayUs,
     I: std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -297,7 +297,7 @@ where
 
         radio.check_receive(true)?;
 
-        radio.delay_us(options.period.as_micros() as u32).unwrap();
+        radio.delay_us(options.period.as_micros() as u32);
 
         if !options.continuous {
             break;
@@ -308,25 +308,25 @@ where
 }
 
 /// Configuration for Echo operation
-#[derive(Clone, StructOpt, PartialEq, Debug)]
+#[derive(Clone, Parser, PartialEq, Debug)]
 pub struct EchoOptions {
     /// Run continuously
-    #[structopt(long = "continuous")]
+    #[clap(long = "continuous")]
     pub continuous: bool,
 
     /// Power in dBm (range -18dBm to 13dBm)
-    #[structopt(long = "power")]
+    #[clap(long = "power")]
     pub power: Option<i8>,
 
     /// Specify delay for response message
-    #[structopt(long = "delay", default_value = "100ms")]
+    #[clap(long = "delay", default_value = "100ms")]
     pub delay: HumanDuration,
 
     /// Append RSSI and LQI to repeated message
-    #[structopt(long = "append-info")]
+    #[clap(long = "append-info")]
     pub append_info: bool,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub blocking_options: BlockingOptions,
 }
 
@@ -336,10 +336,7 @@ pub fn do_echo<T, I, E>(
     options: EchoOptions,
 ) -> Result<usize, BlockingError<E>>
 where
-    T: Receive<Info = I, Error = E>
-        + Transmit<Error = E>
-        + Power<Error = E>
-        + DelayUs<Error = E>,
+    T: Receive<Info = I, Error = E> + Transmit<Error = E> + Power<Error = E> + DelayUs,
     I: ReceiveInfo + std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -372,7 +369,7 @@ where
             }
 
             // Wait for turnaround delay
-            radio.delay_us(options.delay.as_micros() as u32).unwrap();
+            radio.delay_us(options.delay.as_micros() as u32);
 
             // Transmit respobnse
             radio.do_transmit(&buff[..n], options.blocking_options.clone())?;
@@ -384,33 +381,31 @@ where
         }
 
         // Wait for poll delay
-        radio
-            .delay_us(options.blocking_options.poll_interval.as_micros() as u32)
-            .unwrap();
+        radio.delay_us(options.blocking_options.poll_interval.as_micros() as u32);
     }
 }
 
 /// Configuration for Echo operation
-#[derive(Clone, StructOpt, PartialEq, Debug)]
+#[derive(Clone, Parser, PartialEq, Debug)]
 pub struct PingPongOptions {
     /// Specify the number of rounds to tx/rx
-    #[structopt(long, default_value = "100")]
+    #[clap(long, default_value = "100")]
     pub rounds: u32,
 
     /// Power in dBm (range -18dBm to 13dBm)
-    #[structopt(long)]
+    #[clap(long)]
     pub power: Option<i8>,
 
     /// Specify delay for response message
-    #[structopt(long, default_value = "100ms")]
+    #[clap(long, default_value = "100ms")]
     pub delay: HumanDuration,
 
     /// Parse RSSI and other info from response messages
     /// (echo server must have --append-info set)
-    #[structopt(long)]
+    #[clap(long)]
     pub parse_info: bool,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub blocking_options: BlockingOptions,
 }
 
@@ -426,7 +421,7 @@ pub fn do_ping_pong<T, I, E>(
     options: PingPongOptions,
 ) -> Result<LinkTestInfo, BlockingError<E>>
 where
-    T: Receive<Info = I, Error = E> + Transmit<Error = E> + Power<Error = E> + DelayUs<Error = E>,
+    T: Receive<Info = I, Error = E> + Transmit<Error = E> + Power<Error = E> + DelayUs,
     I: ReceiveInfo,
     E: std::fmt::Debug,
 {
@@ -490,7 +485,7 @@ where
         }
 
         // Wait for send delay
-        radio.delay_us(options.delay.as_micros() as u32).unwrap();
+        radio.delay_us(options.delay.as_micros() as u32);
     }
 
     Ok(link_info)

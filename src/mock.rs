@@ -11,9 +11,9 @@ use std::convert::Infallible;
 use std::fmt::Debug;
 use std::vec::Vec;
 
-use log::{debug};
+use log::debug;
 
-use embedded_hal::delay::blocking::DelayUs;
+use embedded_hal::delay::DelayUs;
 
 use embedded_hal_mock::common::Generic;
 
@@ -280,14 +280,10 @@ where
     Irq: PartialEq + Debug + Clone,
     E: PartialEq + Debug + Clone,
 {
-    type Error = Infallible;
-
-    fn delay_us(&mut self, ms: u32) -> Result<(), Self::Error> {
+    fn delay_us(&mut self, ms: u32) {
         let n = self.next().expect("no expectation for delay_us call");
 
         assert_eq!(&n.request, &Request::DelayUs(ms));
-
-        Ok(())
     }
 }
 
