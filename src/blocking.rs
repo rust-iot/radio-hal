@@ -1,6 +1,6 @@
 //! Blocking APIs on top of the base radio traits
 //!
-//! These implementations use the radio's DelayUs implementation to
+//! These implementations use the radio's DelayNs implementation to
 //! poll on completion of operations.
 //!
 //! ## <https://github.com/rust-iot/radio-hal>
@@ -9,7 +9,7 @@
 use core::fmt::Debug;
 use core::time::Duration;
 
-use embedded_hal::delay::DelayUs;
+use embedded_hal::delay::DelayNs;
 
 #[cfg(feature = "defmt")]
 use defmt::debug;
@@ -63,7 +63,7 @@ impl<E> From<E> for BlockingError<E> {
 }
 
 /// Blocking transmit function implemented over `radio::Transmit` and `radio::Power` using the provided
-/// `BlockingOptions` and radio-internal `DelayUs` impl to poll for completion
+/// `BlockingOptions` and radio-internal `DelayNs` impl to poll for completion
 #[cfg_attr(
     feature = "mock",
     doc = r##"
@@ -75,7 +75,7 @@ use radio::{BlockingTransmit, BlockingOptions};
 # let mut radio = MockRadio::new(&[
 #    Transaction::start_transmit(vec![0xaa, 0xbb], None),
 #    Transaction::check_transmit(Ok(false)),
-#    Transaction::delay_us(100),
+#    Transaction::delay_ns(100000),
 #    Transaction::check_transmit(Ok(true)),
 # ]);
 # 
@@ -99,7 +99,7 @@ pub trait BlockingTransmit<E: Debug> {
 
 impl<T, E> BlockingTransmit<E> for T
 where
-    T: Transmit<Error = E> + DelayUs,
+    T: Transmit<Error = E> + DelayNs,
     E: Debug,
 {
     fn do_transmit(
@@ -137,7 +137,7 @@ where
 }
 
 /// Blocking receive function implemented over `radio::Receive` using the provided `BlockingOptions`
-/// and radio-internal `DelayUs` impl to poll for completion
+/// and radio-internal `DelayNs` impl to poll for completion
 #[cfg_attr(
     feature = "mock",
     doc = r##"
@@ -152,7 +152,7 @@ let info = BasicInfo::new(-81, 0);
 # let mut radio = MockRadio::new(&[
 #    Transaction::start_receive(None),
 #    Transaction::check_receive(true, Ok(false)),
-#    Transaction::delay_us(100),
+#    Transaction::delay_ns(100000),
 #    Transaction::check_receive(true, Ok(true)),
 #    Transaction::get_received(Ok((data.to_vec(), info.clone()))),
 # ]);
@@ -184,7 +184,7 @@ pub trait BlockingReceive<I, E> {
 
 impl<T, I, E> BlockingReceive<I, E> for T
 where
-    T: Receive<Info = I, Error = E> + DelayUs,
+    T: Receive<Info = I, Error = E> + DelayNs,
     <T as Receive>::Info: Debug,
     I: Debug,
     E: Debug,
@@ -228,7 +228,7 @@ pub trait BlockingSetState<S, E> {
 
 impl<T, S, E> BlockingSetState<S, E> for T
 where
-    T: State<State = S, Error = E> + DelayUs,
+    T: State<State = S, Error = E> + DelayNs,
     S: Debug + core::cmp::PartialEq + Copy,
     E: Debug,
 {

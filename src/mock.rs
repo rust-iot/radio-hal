@@ -13,7 +13,7 @@ use std::vec::Vec;
 
 use log::debug;
 
-use embedded_hal::delay::DelayUs;
+use embedded_hal::delay::DelayNs;
 
 use embedded_hal_mock::common::Generic;
 
@@ -217,9 +217,9 @@ impl<St, Reg, Ch, Inf, Irq, E> Transaction<St, Reg, Ch, Inf, Irq, E> {
     }
 
     /// Delay for a certain time
-    pub fn delay_us(ms: u32) -> Self {
+    pub fn delay_ns(ns: u32) -> Self {
         Self {
-            request: Request::DelayUs(ms),
+            request: Request::DelayNs(ns),
             response: Response::Ok,
         }
     }
@@ -247,7 +247,7 @@ enum Request<St, Reg, Ch> {
     CheckReceive(bool),
     GetReceived,
 
-    DelayUs(u32),
+    DelayNs(u32),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -271,7 +271,7 @@ impl<St, Inf, Irq, E> From<Option<E>> for Response<St, Inf, Irq, E> {
     }
 }
 
-impl<St, Reg, Ch, Inf, Irq, E> DelayUs for Radio<St, Reg, Ch, Inf, Irq, E>
+impl<St, Reg, Ch, Inf, Irq, E> DelayNs for Radio<St, Reg, Ch, Inf, Irq, E>
 where
     St: PartialEq + Debug + Clone,
     Reg: PartialEq + Debug + Clone,
@@ -280,10 +280,10 @@ where
     Irq: PartialEq + Debug + Clone,
     E: PartialEq + Debug + Clone,
 {
-    fn delay_us(&mut self, ms: u32) {
-        let n = self.next().expect("no expectation for delay_us call");
+    fn delay_ns(&mut self, ns: u32) {
+        let n = self.next().expect("no expectation for delay_ns call");
 
-        assert_eq!(&n.request, &Request::DelayUs(ms));
+        assert_eq!(&n.request, &Request::DelayNs(ns));
     }
 }
 

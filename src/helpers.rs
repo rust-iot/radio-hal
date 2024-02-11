@@ -18,7 +18,7 @@ use log::{debug, info};
 use defmt::{debug, info};
 
 use clap::Parser;
-use embedded_hal::delay::DelayUs;
+use embedded_hal::delay::DelayNs;
 use humantime::Duration as HumanDuration;
 
 use byteorder::{ByteOrder, NetworkEndian};
@@ -62,7 +62,7 @@ where
         + Receive<Info = I, Error = E>
         + Rssi<Error = E>
         + Power<Error = E>
-        + DelayUs,
+        + DelayNs,
     I: ReceiveInfo + Default + std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -102,7 +102,7 @@ pub struct TransmitOptions {
 
 pub fn do_transmit<T, E>(radio: &mut T, options: TransmitOptions) -> Result<(), BlockingError<E>>
 where
-    T: Transmit<Error = E> + Power<Error = E> + DelayUs,
+    T: Transmit<Error = E> + Power<Error = E> + DelayNs,
     E: core::fmt::Debug,
 {
     // Set output power if specified
@@ -218,7 +218,7 @@ pub fn do_receive<T, I, E>(
     options: ReceiveOptions,
 ) -> Result<usize, E>
 where
-    T: Receive<Info = I, Error = E> + DelayUs,
+    T: Receive<Info = I, Error = E> + DelayNs,
     I: std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -282,7 +282,7 @@ pub struct RssiOptions {
 
 pub fn do_rssi<T, I, E>(radio: &mut T, options: RssiOptions) -> Result<(), E>
 where
-    T: Receive<Info = I, Error = E> + Rssi<Error = E> + DelayUs,
+    T: Receive<Info = I, Error = E> + Rssi<Error = E> + DelayNs,
     I: std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -336,7 +336,7 @@ pub fn do_echo<T, I, E>(
     options: EchoOptions,
 ) -> Result<usize, BlockingError<E>>
 where
-    T: Receive<Info = I, Error = E> + Transmit<Error = E> + Power<Error = E> + DelayUs,
+    T: Receive<Info = I, Error = E> + Transmit<Error = E> + Power<Error = E> + DelayNs,
     I: ReceiveInfo + std::fmt::Debug,
     E: std::fmt::Debug,
 {
@@ -421,7 +421,7 @@ pub fn do_ping_pong<T, I, E>(
     options: PingPongOptions,
 ) -> Result<LinkTestInfo, BlockingError<E>>
 where
-    T: Receive<Info = I, Error = E> + Transmit<Error = E> + Power<Error = E> + DelayUs,
+    T: Receive<Info = I, Error = E> + Transmit<Error = E> + Power<Error = E> + DelayNs,
     I: ReceiveInfo,
     E: std::fmt::Debug,
 {
